@@ -9,7 +9,7 @@ Terminal utilities for CLI, TUI, IO and general use.
 | Package | Contents |
 |---------|----------|
 | `termz.cli` | Styled console output via [Rich](https://github.com/Textualize/rich) |
-| `termz.tui` | [Textual](https://github.com/Textualize/textual) TUI helpers — theme loading, custom widgets, modal screens |
+| `termz.tui` | [Textual](https://github.com/Textualize/textual) TUI helpers – theme loading, custom widgets, modal screens |
 | `termz.io` | SQLite database abstraction, JSON app-state storage, file utilities |
 | `termz.util` | Datetime helpers, string utilities, singleton metaclass, debug decorators, logging setup |
 
@@ -27,7 +27,7 @@ pip install termz
 
 ---
 
-## termz.cli — Styled CLI Output
+## termz.cli – Styled CLI Output
 
 Provides helpers for printing color-coded panels using Rich and for clearing terminal output.
 
@@ -58,7 +58,7 @@ clear_lines(4)
 
 ---
 
-## termz.tui — Textual TUI Helpers
+## termz.tui – Textual TUI Helpers
 
 ### ThemeLoader
 
@@ -123,7 +123,7 @@ async def confirm_delete(self):
 
 ### CustomDataTable
 
-A subclass of Textual's `DataTable` that supports *flexible columns* — columns that automatically fill the remaining width when the terminal is resized.
+A subclass of Textual's `DataTable` that supports *flexible columns* – columns that automatically fill the remaining width when the terminal is resized.
 
 ```python
 from termz.tui.custom_widgets.custom_data_table import CustomDataTable
@@ -161,8 +161,8 @@ yield CustomSelectionList(
 
 A drop-in replacement for Textual's built-in `Footer` that supports multiple rows of key bindings. Two modes are available:
 
-- **`auto_wrap=True`** (default) — bindings wrap automatically when the row is full.
-- **`auto_wrap=False`** — bindings are assigned to rows explicitly via `row_map`.
+- **`auto_wrap=True`** (default) – bindings wrap automatically when the row is full.
+- **`auto_wrap=False`** – bindings are assigned to rows explicitly via `row_map`.
 
 ```python
 from termz.tui.custom_widgets.multiline_footer import MultiLineFooter
@@ -239,7 +239,7 @@ def check_action(self, action, parameters):
 
 ---
 
-## termz.io — IO Utilities
+## termz.io – IO Utilities
 
 ### AppStateStorage
 
@@ -334,7 +334,7 @@ Textfile.write("notes.txt", "New content")
 
 ---
 
-## termz.util — General Utilities
+## termz.util – General Utilities
 
 ### Logging
 

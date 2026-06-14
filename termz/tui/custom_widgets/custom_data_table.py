@@ -8,7 +8,7 @@ This module defines `CustomDataTable`, a subclass of Textual's `DataTable`
 with additional capabilities for handling dynamic resizing of table columns
 based on available space.
 
-The primary enhancement is the introduction of *flexible columns* — a list of
+The primary enhancement is the introduction of *flexible columns* - a list of
 column keys that automatically adjust their widths when the table is resized.
 This allows developers to create responsive and adaptive data tables where
 certain columns expand or contract depending on the widget size, while others
