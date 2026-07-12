@@ -5,7 +5,7 @@ from textual.widgets._toggle_button import ToggleButton
 from textual.strip import Strip
 from rich.segment import Segment
 
-_SelectionType = TypeVar('_SelectionType')
+_SelectionType = TypeVar("_SelectionType")
 
 
 class CustomSelectionList(SelectionList[_SelectionType]):
@@ -20,7 +20,7 @@ class CustomSelectionList(SelectionList[_SelectionType]):
     CUSTOM_BUTTON_INNER : str
         The character to display when an item is selected.
     """
-    CUSTOM_BUTTON_INNER = '✔'
+    CUSTOM_BUTTON_INNER = "✔"
 
 
     def __init__(self, *args, **kwargs) -> None:  # pyright:ignore[reportUnknownParameterType, reportMissingParameterType]
@@ -61,7 +61,7 @@ class CustomSelectionList(SelectionList[_SelectionType]):
                 if selection.value in self._selected:
                     segment_text = self.CUSTOM_BUTTON_INNER
                 else:
-                    segment_text = ' '
+                    segment_text = " "
 
                 # Create a new segment with the custom check mark and same style
                 segment_style = segment.style

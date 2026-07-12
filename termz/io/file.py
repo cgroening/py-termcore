@@ -109,15 +109,15 @@ class File:
 
         # Loop folder items
         for item in items_list:
-            item_path = path + '/' + item
+            item_path = path + "/" + item
 
             # Recursion if the item is a folder
             if os.path.isdir(item_path) and withsubfolders:
                 items_dict = {**items_dict, **File.folder_content(
-                     item_path + '/', extfilter, withsubfolders, level=level+1)}
-                item_type = 'folder'
+                     item_path + "/", extfilter, withsubfolders, level=level+1)}
+                item_type = "folder"
             else:
-                item_type = 'file'
+                item_type = "file"
 
             # Add item to dictionary
             if File.extension(item) == extfilter or extfilter is None:
@@ -159,7 +159,7 @@ class File:
         # TODO: Also copy sub folder (-> recursion)
         file_list = os.listdir(source)
         for file_name in file_list:
-            shutil.copyfile(source + '/' + file_name, target + '/' + file_name)
+            shutil.copyfile(source + "/" + file_name, target + "/" + file_name)
 
     @staticmethod
     def extension(file_name: str) -> str | None:
@@ -178,12 +178,12 @@ class File:
             no extension.
         """
         # Dateiname anhand von . in Liste splitten
-        file_name_split = file_name.split('.')
+        file_name_split = file_name.split(".")
         count = len(file_name_split)
 
         # Das letzte Element der Liste (= Dateiendung) zurückgeben
         if count > 1:
-            return file_name.split('.')[count - 1]
+            return file_name.split(".")[count - 1]
         else:
             return None
 
@@ -205,7 +205,7 @@ class File:
             The file name with the updated extension.
         """
         # Split file name into list by "."
-        file_name_split = file_name.split('.')
+        file_name_split = file_name.split(".")
         count = len(file_name_split)
 
         # Replace the last element of the list (old extension) and replace it
@@ -213,7 +213,7 @@ class File:
         if count > 1:
             file_name_split[count-1] = extension
             print(file_name_split)
-            file_name = '.'.join(file_name_split)
+            file_name = ".".join(file_name_split)
 
         return file_name
 
@@ -232,8 +232,8 @@ class File:
         str
             The folder path without the file name.
         """
-        file_path_list: list[str] = file_path.split('/')
+        file_path_list: list[str] = file_path.split("/")
         file_path_list.remove(file_path_list[len(file_path_list) - 1])
-        file_path = '/'.join(file_path_list)
+        file_path = "/".join(file_path_list)
 
         return file_path

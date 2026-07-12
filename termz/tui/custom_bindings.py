@@ -139,7 +139,7 @@ class CustomBindings():
         """
         Loads the binding definitions from the YAML file into a dictionary.
         """
-        with open(self._yaml_file_path, 'r', encoding='utf-8') as file:
+        with open(self._yaml_file_path, "r", encoding="utf-8") as file:
             self._bindings_dict_raw = yaml.safe_load(file)
 
     def _process_bindings(self):
@@ -157,17 +157,17 @@ class CustomBindings():
 
             # Loop bindings
             for binding in bindings:
-                key         = self._parse_key(binding.get('key'))
-                action      = self._parse_action(binding.get('action'), group)
-                description = self._parse_description(binding.get('description'))
-                show        = self._parse_show(binding.get('show'))
+                key         = self._parse_key(binding.get("key"))
+                action      = self._parse_action(binding.get("action"), group)
+                description = self._parse_description(binding.get("description"))
+                show        = self._parse_show(binding.get("show"))
                 key_display = self._parse_key_display(
-                                  key, binding.get('key_display'), group
+                                  key, binding.get("key_display"), group
                               )
-                priority    = self._parse_priority(binding.get('priority'))
-                tooltip     = self._parse_tooltip(binding.get('tooltip'))
-                id          = self._parse_id(binding.get('id'))
-                system      = self._parse_system(binding.get('system'))
+                priority    = self._parse_priority(binding.get("priority"))
+                tooltip     = self._parse_tooltip(binding.get("tooltip"))
+                id          = self._parse_id(binding.get("id"))
+                system      = self._parse_system(binding.get("system"))
 
                 # Skip if any required field is missing
                 if key is None or action is None or description is None:
@@ -193,10 +193,10 @@ class CustomBindings():
                     self._action_to_groups[action].append(group)
 
                 # Store row for this action
-                self._action_row_map[action] = int(binding.get('row', 0))
+                self._action_row_map[action] = int(binding.get("row", 0))
 
                 # Add action to global actions if applicable
-                if group.startswith('_global'):
+                if group.startswith("_global"):
                     self._global_actions.append(action)
 
         # logging.debug(f'Bindings: {pprint.pformat(self.bindings_dict)}')
@@ -220,7 +220,7 @@ class CustomBindings():
         use_app_prefix = for_screen or bool(screen_name)
         row_map: dict[str, int] = {}
         for action, row in self._action_row_map.items():
-            key = f'app.{action}' if use_app_prefix and action in self._global_actions else action
+            key = f"app.{action}" if use_app_prefix and action in self._global_actions else action
             row_map[key] = row
         return row_map
 
@@ -251,9 +251,9 @@ class CustomBindings():
         """
         def get_sort_key(binding: Binding):
             """Transforms a key like "F1" or "f1" to "f01" for sorting."""
-            match = re.match(r'(f)(\d+)', binding.key.lower())
+            match = re.match(r"(f)(\d+)", binding.key.lower())
             if match:
-                return f'{match.group(1)}{int(match.group(2)):02d}'
+                return f"{match.group(1)}{int(match.group(2)):02d}"
             return binding.key.lower()
 
         # Sort each group of bindings by their key
@@ -262,7 +262,7 @@ class CustomBindings():
                 self._bindings_dict[group] = sorted(bindings, key=get_sort_key)
 
         # Collect global bindings (non-destructive)
-        global_groups = [g for g in self._bindings_dict if g.startswith('_global')]
+        global_groups = [g for g in self._bindings_dict if g.startswith("_global")]
         global_bindings: list[BindingType] = []
         for g in global_groups:
             global_bindings.extend(self._bindings_dict.get(g, []))
@@ -271,7 +271,7 @@ class CustomBindings():
         bindings_list: list[BindingType] = []
         for group, bindings in self._bindings_dict.items():
             # Always skip global and screen groups in the main loop
-            if group.startswith('_global') or group.endswith('_screen'):
+            if group.startswith("_global") or group.endswith("_screen"):
                 continue
             # If a tab name is given, only include bindings for that tab
             if tab_name:
@@ -285,7 +285,7 @@ class CustomBindings():
 
         # Append screen-specific bindings when screen_name is given
         if screen_name:
-            screen_group = f'{screen_name.lower()}_screen'
+            screen_group = f"{screen_name.lower()}_screen"
             bindings_list.extend(self._bindings_dict.get(screen_group, []))
 
         # Append global bindings, prefixed with 'app.' for screen context
@@ -293,7 +293,7 @@ class CustomBindings():
             global_bindings = [
                 Binding(
                     key=b.key,
-                    action=f'app.{b.action}',
+                    action=f"app.{b.action}",
                     description=b.description,
                     show=b.show,
                     key_display=b.key_display,
@@ -379,9 +379,9 @@ class CustomBindings():
         """
         if action is None:
             return None
-        if group.startswith('_global') or group.endswith('_screen'):
+        if group.startswith("_global") or group.endswith("_screen"):
             return action
-        return f'{group}_{action}'
+        return f"{group}_{action}"
 
     def _parse_description(self, description: str | None) -> str | None:
         """Parses the description field from the YAML binding definition."""
@@ -412,7 +412,7 @@ class CustomBindings():
 
         match = re.fullmatch(r"(f)(\d+)", key.lower())
         if match:
-            key_display = f'F{int(match.group(2))}'
+            key_display = f"F{int(match.group(2))}"
 
         # if group.startswith('_global'):
         #     key_display = f'*{key_display or key}'
@@ -435,7 +435,7 @@ class CustomBindings():
         an empty string.
         """
         if tooltip is None:
-            return ''
+            return ""
         else:
             return tooltip
 

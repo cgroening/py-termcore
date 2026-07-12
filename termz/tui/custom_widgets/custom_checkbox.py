@@ -14,7 +14,7 @@ class CustomCheckbox(Checkbox):
     CUSTOM_BUTTON_INNER : str
         The character to display when the checkbox is checked.
     """
-    CUSTOM_BUTTON_INNER = '✔'
+    CUSTOM_BUTTON_INNER = "✔"
 
 
     def __init__(self, *args, **kwargs) -> None:  # pyright:ignore[reportUnknownParameterType, reportMissingParameterType]
@@ -31,4 +31,4 @@ class CustomCheckbox(Checkbox):
         if self.value:
             self.BUTTON_INNER = self.CUSTOM_BUTTON_INNER
         else:
-            self.BUTTON_INNER = ' '  # pyright:ignore[reportConstantRedefinition]
+            self.BUTTON_INNER = " "  # pyright:ignore[reportConstantRedefinition]

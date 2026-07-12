@@ -42,15 +42,15 @@ def timestamp_to_date(
     """
     # Return empty string if the given timestamp is None
     if timestamp is None:
-        return ''
+        return ""
 
     # Convert timestamp to date
     date_obj = datetime.fromtimestamp(timestamp)
 
     if english_format:
-        format_str = '%Y-%m-%d'
+        format_str = "%Y-%m-%d"
     else:
-        format_str = '%d.%m.%Y'
+        format_str = "%d.%m.%Y"
 
     return date_obj.strftime(format_str)
 
@@ -75,9 +75,9 @@ def date_to_timestamp(date_str: str, english_format: bool = False) \
         Unix timestamp (number of seconds since 1970-01-01).
     """
     if english_format:
-        format_str = '%Y-%m-%d'
+        format_str = "%Y-%m-%d"
     else:
-        format_str = '%d.%m.%Y'
+        format_str = "%d.%m.%Y"
 
     # Check if the date string matches the expected format
     try:

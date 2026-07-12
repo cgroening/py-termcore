@@ -41,10 +41,10 @@ def linewrap(text: str, linewidth: int):
 
         # If the maximum portion doesn't end with a whitespace, cut off
         # at the last whitespace
-        if len(text) > linewidth and text[maxcutpos-1] != ' ' \
-           and text[maxcutpos] != ' ':
+        if len(text) > linewidth and text[maxcutpos-1] != " " \
+           and text[maxcutpos] != " ":
             # Position of the last whitespace
-            cutpos = max(charpos(text[0:maxcutpos-1], ' '))
+            cutpos = max(charpos(text[0:maxcutpos-1], " "))
         else:
             cutpos = maxcutpos
 
@@ -54,11 +54,11 @@ def linewrap(text: str, linewidth: int):
 
         # Add line break if it's not the last line of the text
         if maxcutpos == linewidth and len(text[0:linewidth].strip()) > 0:
-            line += '\n'
+            line += "\n"
 
         lines.append(line)
 
-    return ''.join(lines)
+    return "".join(lines)
 
 
 def charpos(text: str, char: str) -> list[int]:
@@ -80,7 +80,7 @@ def charpos(text: str, char: str) -> list[int]:
     return [pos for pos, c in enumerate(text) if c == char]
 
 
-def str_with_fixed_width(text: str, width: int, align: str = 'left') -> str:
+def str_with_fixed_width(text: str, width: int, align: str = "left") -> str:
     """
     Return a string truncated or padded to exactly `width` characters.
 
@@ -102,15 +102,15 @@ def str_with_fixed_width(text: str, width: int, align: str = 'left') -> str:
         A string of exactly `width` characters.
     """
     if len(text) > width:
-        if align == 'right':
-            return '…' + text[-(width - 1):]
-        return text[:width - 1] + '…'
+        if align == "right":
+            return "…" + text[-(width - 1):]
+        return text[:width - 1] + "…"
 
-    if align == 'left':
+    if align == "left":
         return text.ljust(width)
-    elif align == 'right':
+    elif align == "right":
         return text.rjust(width)
-    elif align == 'center':
+    elif align == "center":
         return text.center(width)
     else:
-        raise ValueError(f'Invalid alignment: {align}')
+        raise ValueError(f"Invalid alignment: {align}")

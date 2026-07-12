@@ -34,27 +34,27 @@ class SQLComparisonOperator(Enum):
     """
     Enumeration defining comparison operators (<, <=, =, >=, >) for SQL queries.
     """
-    LT = '<'
-    LE = '<='
-    EQ = '='
-    GE = '>='
-    GT = '>'
+    LT = "<"
+    LE = "<="
+    EQ = "="
+    GE = ">="
+    GT = ">"
 
 
 class SQLCombinationOperator(Enum):
     """
     Enumeration defining combination operators (AND, OR) for SQL conditions.
     """
-    AND = 'AND'
-    OR = 'OR'
+    AND = "AND"
+    OR = "OR"
 
 
 class SQLOrderByDirection(Enum):
     """
     Enumeration defining sorting order (ASC or DESC) for SQL queries.
     """
-    ASC = 'ASC'
-    DESC = 'DESC'
+    ASC = "ASC"
+    DESC = "DESC"
 
 
 @dataclass(slots=True, frozen=True)
@@ -247,46 +247,46 @@ class Database:
         """
         # Generate columns string for SELECT
         if columns is None:
-            cols_str = '*'
+            cols_str = "*"
         else:
-            cols_str = ', '.join(columns)
+            cols_str = ", ".join(columns)
 
         # Generate string of conditions for WHERE
         if conditions is not None and len(conditions) > 0:
-            conds_str = ' WHERE ' + self._generate_conditions_str(conditions)
+            conds_str = " WHERE " + self._generate_conditions_str(conditions)
         else:
-            conds_str = ''
+            conds_str = ""
 
         # Generate string for ORDER BY
         if orderby is not None and len(orderby) > 0:
-            orderby_str = 'ORDER BY '
+            orderby_str = "ORDER BY "
             for column in orderby:
-                orderby_str += f'{column.column_name} {column.direction.value}'
+                orderby_str += f"{column.column_name} {column.direction.value}"
 
                 # Add comma if it's not the last dictionary element
                 if column is not orderby[-1]:
-                    orderby_str += ', '
+                    orderby_str += ", "
         else:
-            orderby_str = ''
+            orderby_str = ""
 
         # Generate string for LIMIT
         if limit is not None and limit > 0:
-            limit_str = f'LIMIT {limit}'
+            limit_str = f"LIMIT {limit}"
         else:
-            limit_str = ''
+            limit_str = ""
 
         # Generate string for OFFSET
         if offset is not None and offset > 0:
-            offset_str = f'OFFSET {offset}'
+            offset_str = f"OFFSET {offset}"
         else:
-            offset_str = ''
+            offset_str = ""
 
         # SQL query
-        sql = f'SELECT {cols_str} FROM {table}'  # SELECT ... FROM ...
+        sql = f"SELECT {cols_str} FROM {table}"  # SELECT ... FROM ...
         sql += conds_str                         # WHERE
-        sql += ' ' + orderby_str                 # ORDER BY ...
-        sql += ' ' + limit_str                   # LIMIT ...
-        sql += ' ' + offset_str                  # OFFSET ...
+        sql += " " + orderby_str                 # ORDER BY ...
+        sql += " " + limit_str                   # LIMIT ...
+        sql += " " + offset_str                  # OFFSET ...
         self.query(sql)
 
         # Return a list of dictionaries (one for each row)
@@ -319,19 +319,19 @@ class Database:
         # Loop rows in data
         for row in data:
             # Generate columns string
-            cols = ', '.join(list(row.keys()))
+            cols = ", ".join(list(row.keys()))
 
             # Generate values string, check if type == str
-            vals = ''
+            vals = ""
             for col, val in row.items():
                 vals += self.tostr(val)
 
                 # Add comma if it's not the last dictionary element
                 if col is not list(row.keys())[-1]:
-                    vals += ', '
+                    vals += ", "
 
             # SQL query
-            sql = f'INSERT INTO {table} ({cols}) VALUES ({vals})'
+            sql = f"INSERT INTO {table} ({cols}) VALUES ({vals})"
             self.query(sql)
 
             # Get last inserted row
@@ -340,7 +340,7 @@ class Database:
             result = self.fetch(
                 table,
                 conditions=[
-                    Condition('id', SQLComparisonOperator.EQ, last_id or 0)
+                    Condition("id", SQLComparisonOperator.EQ, last_id or 0)
                 ]
             )
             if result:
@@ -378,7 +378,7 @@ class Database:
         # Loop rows in data
         for i in range(0, len(data)):
             conditions: list[Condition] = []
-            cols_str = ''
+            cols_str = ""
 
             # Create a deep copy of the dict for this row, so it can be looped
             # (the original dictionary changes size in the following loop)
@@ -386,7 +386,7 @@ class Database:
 
             # Loop columns in row
             for col, val in row.items():
-                if col[0] == '@':
+                if col[0] == "@":
                     # Get conditions for this row and remove them from data dict
                     conditions = cast(list[Condition], val)
                     del data[i][col]
@@ -395,17 +395,17 @@ class Database:
             row = data[i]
             for col, val in row.items():
                 # Add "col = val"
-                cols_str += f'{col}={self.tostr(val)}'
+                cols_str += f"{col}={self.tostr(val)}"
 
                 # Add comma if it's not the last dictionary element
                 if col is not list(row.keys())[-1]:
-                    cols_str += ', '
+                    cols_str += ", "
 
             # Generate conditions string
             cond_str = self._generate_conditions_str(conditions)
 
             # SQL query
-            sql = f'UPDATE {table} SET {cols_str} WHERE {cond_str}'
+            sql = f"UPDATE {table} SET {cols_str} WHERE {cond_str}"
             self.query(sql)
             self.connection.commit()
 
@@ -424,7 +424,7 @@ class Database:
         cond_str = self._generate_conditions_str(conditions)
 
         # SQL query
-        sql = f'DELETE FROM {table} WHERE {cond_str}'
+        sql = f"DELETE FROM {table} WHERE {cond_str}"
         self.query(sql)
         self.connection.commit()
 
@@ -442,18 +442,18 @@ class Database:
         str
             String representation of the conditions for WHERE clause.
         """
-        cond_str = ''
+        cond_str = ""
 
         # Loop conditions
         cond: Condition
         for cond in conditions:
             # Add "AND"/"OR" if it's not the first condition
             if cond is not conditions[0]:
-                cond_str += ' ' + cond.combination.value + ' '
+                cond_str += " " + cond.combination.value + " "
 
             # Add "col = val"/"col > val"/...
-            cond_str += (f'{cond.column_name}{cond.operator.value}'
-                         f'{self.tostr(cond.value)}')
+            cond_str += (f"{cond.column_name}{cond.operator.value}"
+                         f"{self.tostr(cond.value)}")
 
         return cond_str
 
@@ -478,10 +478,10 @@ class Database:
         """
         if value is None:
             # None -> NULL
-            return 'NULL'
+            return "NULL"
         elif isinstance(value, str):
             # Add quotes to string
-            return '\'' + str(value).replace('\'', '\'\'') + '\''
+            return "'" + str(value).replace("'", "''") + "'"
         else:
             return str(value)
 

@@ -30,7 +30,7 @@ from textual.widgets import DataTable
 from textual.coordinate import Coordinate
 from textual.widgets._data_table import ColumnKey, Column
 
-_CellType = TypeVar('_CellType')
+_CellType = TypeVar("_CellType")
 
 
 class CustomDataTable(DataTable[_CellType]):

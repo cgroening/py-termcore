@@ -22,27 +22,27 @@ def get_console() -> Console:
 
 def print_error(message: str) -> None:
     """Prints an error message in a red panel using Rich."""
-    print_panel(f'✗ {message}', 'red')
+    print_panel(f"✗ {message}", "red")
 
 
 def print_warning(message: str) -> None:
     """Prints a warning message in a yellow panel using Rich."""
-    print_panel(f'⚠ {message}', 'yellow')
+    print_panel(f"⚠ {message}", "yellow")
 
 
 def print_success(message: str) -> None:
     """Prints a success message in a green panel using Rich."""
-    print_panel(f'✓ {message}', 'green')
+    print_panel(f"✓ {message}", "green")
 
 
 def print_info(message: str) -> None:
     """Prints an info message in a cyan panel using Rich."""
-    print_panel(f'ℹ {message}', 'cyan')
+    print_panel(f"ℹ {message}", "cyan")
 
 
 def print_panel(message: str, color: str) -> None:
     """Prints a message in a red panel with the given color using Rich."""
-    formatted_message = f'[{color} bold]{message}[/{color} bold]'
+    formatted_message = f"[{color} bold]{message}[/{color} bold]"
     print_custom_panel(formatted_message, color)
 
 
@@ -60,5 +60,5 @@ def print_custom_panel(formatted_message: str, panel_color: str) -> None:
 
 def clear_lines(count: int) -> None:
     """Move cursor up `count` lines and clear everything below."""
-    _ = sys.stdout.write(f'\033[{count}A\033[0J')
+    _ = sys.stdout.write(f"\033[{count}A\033[0J")
     _ = sys.stdout.flush()

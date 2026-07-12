@@ -29,11 +29,11 @@ class ButtonColor(Enum):
     """
     Enum for button colors.
     """
-    DEFAULT = 'default'
-    PRIMARY = 'primary'
-    ERROR = 'error'
-    SUCCESS = 'success'
-    WARNING = 'warning'
+    DEFAULT = "default"
+    PRIMARY = "primary"
+    ERROR = "error"
+    SUCCESS = "success"
+    WARNING = "warning"
 
 
 class QuestionScreen(ModalScreen[bool]):
@@ -43,7 +43,7 @@ class QuestionScreen(ModalScreen[bool]):
     yes_button_color: ButtonColor
     no_button_color: ButtonColor
     BINDINGS = [
-        ('escape', 'close_modal', 'Close'),
+        ("escape", "close_modal", "Close"),
     ]
     CSS = """
         QuestionScreen {
@@ -90,10 +90,10 @@ class QuestionScreen(ModalScreen[bool]):
         Compose the screen layout.
         """
         yield Grid(
-            Label(self.question, id='question'),
-            Button('Yes', variant=self.yes_button_color.value, id='yes'),
-            Button('No', variant=self.no_button_color.value, id='no'),
-            id='dialog',
+            Label(self.question, id="question"),
+            Button("Yes", variant=self.yes_button_color.value, id="yes"),
+            Button("No", variant=self.no_button_color.value, id="no"),
+            id="dialog",
         )
 
     def action_close_modal(self) -> None:
@@ -102,14 +102,14 @@ class QuestionScreen(ModalScreen[bool]):
         """
         self.dismiss(False)
 
-    @on(Button.Pressed, '#yes')
+    @on(Button.Pressed, "#yes")
     def handle_yes(self) -> None:
         """
         Handle the "Yes" button press.
         """
         self.dismiss(True)
 
-    @on(Button.Pressed, '#no')
+    @on(Button.Pressed, "#no")
     def handle_no(self) -> None:
         """
         Handle the "No" button press.

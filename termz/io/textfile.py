@@ -49,7 +49,7 @@ class Textfile:
         list[str]
             A list containing all lines from the text file.
         """
-        with open(path, 'r+') as f:
+        with open(path, "r+") as f:
             return f.readlines()
 
     @staticmethod
@@ -67,7 +67,7 @@ class Textfile:
         str
             The complete content of the text file as a string.
         """
-        with open(path, 'r+') as f:
+        with open(path, "r+") as f:
             return f.read()
 
     @staticmethod
@@ -85,7 +85,7 @@ class Textfile:
         text : str
             Content of the text file.
         """
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             f.seek(0)               # Set stream to the beginning of the file
-            f.write(''.join(text))  # Write text to file
+            f.write("".join(text))  # Write text to file
             f.truncate()            # Remove old text

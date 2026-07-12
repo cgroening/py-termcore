@@ -44,8 +44,8 @@ from collections.abc import Callable
 from functools import wraps
 from typing import ParamSpec, TypeVar
 
-P = ParamSpec('P')
-R = TypeVar('R')
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 def print_arguments(fn: Callable[P, R]) -> Callable[P, R]:
@@ -81,15 +81,15 @@ def print_arguments(fn: Callable[P, R]) -> Callable[P, R]:
             The original return value of the decorated function.
         """
         # Print function name + args and kwargs
-        print(f'Function {fn.__name__} called')
-        print(f'Args: {args}')
-        print(f'Kwargs: {kwargs}')
+        print(f"Function {fn.__name__} called")
+        print(f"Args: {args}")
+        print(f"Kwargs: {kwargs}")
 
         # Call function
         fn_result = fn(*args, **kwargs)
 
         # Print return value of the function
-        print(f'Function {fn.__name__} returns: {fn_result}')
+        print(f"Function {fn.__name__} returns: {fn_result}")
 
         return fn_result
 
@@ -116,11 +116,11 @@ def timing(use_ns_timer: bool = False) -> Callable[[Callable[P, R]], Callable[P,
     if use_ns_timer:
         # Use nanosecond precision timing
         time_fn = time.perf_counter_ns
-        time_scale = 'ns'
+        time_scale = "ns"
     else:
         # Use second precision timing
         time_fn = time.perf_counter  # type: ignore
-        time_scale = 's'
+        time_scale = "s"
 
     def wrap_with_timing(fn: Callable[P, R]) -> Callable[P, R]:
         """
@@ -163,7 +163,7 @@ def timing(use_ns_timer: bool = False) -> Callable[[Callable[P, R]], Callable[P,
             # Store end time + calculate and print execution time
             end_time = time_fn()
             duration = end_time - start_time
-            print(f'Function {fn.__name__} took: {duration} {time_scale}')
+            print(f"Function {fn.__name__} took: {duration} {time_scale}")
 
             return fn_result
 

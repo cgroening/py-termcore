@@ -10,10 +10,10 @@ from textual.app import App
 from textual.theme import Theme
 
 
-DEFAULT_TERMZ_THEME_PREFIX = 'TERMZ_'
-DEFAULT_CUSTOM_THEME_PREFIX = 'CUSTOM_'
+DEFAULT_TERMZ_THEME_PREFIX = "TERMZ_"
+DEFAULT_CUSTOM_THEME_PREFIX = "CUSTOM_"
 SCRIPT_DIR = Path(__file__).parent.parent
-STANDARD_THEMES_DIR = SCRIPT_DIR / 'tui/themes'
+STANDARD_THEMES_DIR = SCRIPT_DIR / "tui/themes"
 
 
 @dataclass(frozen=False, slots=True)
@@ -46,8 +46,8 @@ class ThemeLoader:
 
     def __init__(
         self, theme_folder: str | None = None,
-        termz_theme_prefix: str = DEFAULT_TERMZ_THEME_PREFIX or '',
-        custom_theme_prefix: str = DEFAULT_CUSTOM_THEME_PREFIX or '',
+        termz_theme_prefix: str = DEFAULT_TERMZ_THEME_PREFIX or "",
+        custom_theme_prefix: str = DEFAULT_CUSTOM_THEME_PREFIX or "",
         include_standard_themes: bool = True
     ) -> None:
         """
@@ -78,7 +78,7 @@ class ThemeLoader:
         self._clear_package_cache(folder_name)
         self._process_themes(folder_name, prefix, theme_folder_path)
         logging.info(
-            f'Found {len(self._theme_names)} themes in "{theme_folder_path}".'
+            f"Found {len(self._theme_names)} themes in \"{theme_folder_path}\"."
         )
 
     def _generate_theme_folder_path_and_prefix(self, standard_themes: bool) \
@@ -98,7 +98,7 @@ class ThemeLoader:
 
         if not theme_folder_path.is_dir():
             logging.warning(
-                f'Theme folder "{theme_folder_path}" not found. Skipping.'
+                f"Theme folder \"{theme_folder_path}\" not found. Skipping."
             )
             return
 
@@ -112,7 +112,7 @@ class ThemeLoader:
         same name, e.g. "themes") and prevents loading new themes.
         """
         for key in list(sys.modules.keys()):
-            if key == folder_name or key.startswith(f'{folder_name}.'):
+            if key == folder_name or key.startswith(f"{folder_name}."):
                 del sys.modules[key]
 
     def _process_themes(
@@ -121,11 +121,11 @@ class ThemeLoader:
         """Imports and registers themes from the given folder path."""
         for item in os.listdir(theme_folder_path):
             full_path = theme_folder_path / item
-            if item.startswith('.') or item.startswith('_') \
+            if item.startswith(".") or item.startswith("_") \
             or not full_path.is_dir():
                 continue
 
-            module_name = f'{folder_name}.{item}.theme'
+            module_name = f"{folder_name}.{item}.theme"
             self._import_and_register_theme(
                 item, prefix, module_name, str(full_path)
             )
@@ -134,7 +134,7 @@ class ThemeLoader:
         """ Generates a list of CSS files in the given folder."""
         css_files: list[str] = []
         for file_name in os.listdir(theme_folder_path):
-            if file_name.endswith('.css') or file_name.endswith('.tcss'):
+            if file_name.endswith(".css") or file_name.endswith(".tcss"):
                 css_files.append(os.path.join(theme_folder_path, file_name))
         return css_files
 
@@ -154,23 +154,23 @@ class ThemeLoader:
         try:
             # Import the theme module (theme.py)
             theme_module = importlib.import_module(module_name)
-            textual_theme = getattr(theme_module, 'TEXTUAL_THEME', None)
+            textual_theme = getattr(theme_module, "TEXTUAL_THEME", None)
             css_files = self._get_css_files_for_theme(full_path)
 
             # Abort if no TEXTUAL_THEME variable is defined
             if not isinstance(textual_theme, Theme):
                 logging.warning(
-                    f'Skipping theme "{theme_name}" (no TEXTUAL_THEME defined)'
+                    f"Skipping theme \"{theme_name}\" (no TEXTUAL_THEME defined)"
                 )
                 return
 
             # Register the theme
             self._save_theme_data(theme_name, prefix, textual_theme, css_files)
-            logging.info(f'Registered theme: {theme_name}')
+            logging.info(f"Registered theme: {theme_name}")
         except ModuleNotFoundError:
-            logging.warning(f'Skipping theme "{theme_name}" (no theme.py)')
+            logging.warning(f"Skipping theme \"{theme_name}\" (no theme.py)")
         except Exception as e:
-            logging.error(f'Error loading theme "{theme_name}": {e}')
+            logging.error(f"Error loading theme \"{theme_name}\": {e}")
 
     def _save_theme_data(
         self, name: str,
@@ -217,14 +217,14 @@ class ThemeLoader:
         """
         if theme_config_file.exists():
             try:
-                with open(theme_config_file, 'r') as f:
+                with open(theme_config_file, "r") as f:
                     config = cast(dict[str, str], json.load(f))
-                    if 'theme' not in config:
+                    if "theme" not in config:
                         logging.warning(
-                            f'Invalid theme config format in {theme_config_file}.'
+                            f"Invalid theme config format in {theme_config_file}."
                         )
                         return default_theme_name
-                    return config.get('theme', theme_config_file.name)
+                    return config.get("theme", theme_config_file.name)
             except (json.JSONDecodeError, IOError):
                 return default_theme_name
         return default_theme_name
@@ -248,7 +248,7 @@ class ThemeLoader:
         for theme_name in self._theme_names:
             theme_data = self._theme_data[theme_name]
             theme_data.textual_theme.name = \
-                f'{theme_data.prefix}{theme_data.textual_theme.name}'
+                f"{theme_data.prefix}{theme_data.textual_theme.name}"
             app.register_theme(theme_data.textual_theme)
 
     def set_previous_theme_in_textual_app(
@@ -272,7 +272,7 @@ class ThemeLoader:
         if theme_name in app.available_themes:
             app.theme = theme_name
 
-        logging.info(f'Set previous theme: {theme_name}')
+        logging.info(f"Set previous theme: {theme_name}")
 
     def save_theme_to_config(
         self, theme_name: str, theme_config_file: Path
@@ -286,8 +286,8 @@ class ThemeLoader:
             If there's an error writing to the config file.
         """
         try:
-            with open(theme_config_file, 'w') as f:
-                json.dump({'theme': theme_name}, f)
+            with open(theme_config_file, "w") as f:
+                json.dump({"theme": theme_name}, f)
         except IOError as e:
             logging.error(f"Could not save theme config: {e}")
 
@@ -315,22 +315,22 @@ class ThemeLoader:
         # Load all CSS files that are in folder themes/{theme_name}/
         theme_data = self._theme_data.get(clean_name)
         if not theme_data or not theme_data.css_files:
-            logging.warning(f'No CSS files found for theme: {clean_name}')
+            logging.warning(f"No CSS files found for theme: {clean_name}")
             return
 
         for css_file in theme_data.css_files:
             try:
                 app.stylesheet.read(str(css_file))
-                logging.debug(f'Loaded CSS file: {css_file}')
+                logging.debug(f"Loaded CSS file: {css_file}")
             except Exception as e:
-                logging.error(f'Error loading CSS file {css_file}: {e}')
+                logging.error(f"Error loading CSS file {css_file}: {e}")
 
         # Re-parse and apply to make sure changes take effect
         app.stylesheet.reparse()
         try:
             app.stylesheet.update(app.screen)
         except Exception as e:
-            logging.error(f'Error updating stylesheet: {e}')
+            logging.error(f"Error updating stylesheet: {e}")
 
     def _remove_all_theme_css(self, app: App[None]) -> None:
         """
@@ -346,7 +346,7 @@ class ThemeLoader:
         """
         themes_dir = STANDARD_THEMES_DIR.resolve()
 
-        logging.debug(f'Removing CSS files from themes directory: {themes_dir}')
+        logging.debug(f"Removing CSS files from themes directory: {themes_dir}")
 
         for key in list(app.stylesheet.source.keys()):
             path_str, _ = key

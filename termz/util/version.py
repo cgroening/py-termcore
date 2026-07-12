@@ -35,7 +35,7 @@ def get_version(
         If `pyproject.toml` exists but contains no `[project] version`.
     """
     if pyproject_toml_parent_path:
-        pyproject_toml = pyproject_toml_parent_path / 'pyproject.toml'
+        pyproject_toml = pyproject_toml_parent_path / "pyproject.toml"
     else:
         pyproject_toml = None
 
@@ -43,7 +43,7 @@ def get_version(
         return pkg_version(package_name)
     except PackageNotFoundError:
         import tomllib
-        toml_path = pyproject_toml or Path('pyproject.toml')
-        with open(toml_path, 'rb') as f:
+        toml_path = pyproject_toml or Path("pyproject.toml")
+        with open(toml_path, "rb") as f:
             data = tomllib.load(f)
-        return cast(str, data['project']['version'])
+        return cast(str, data["project"]["version"])
