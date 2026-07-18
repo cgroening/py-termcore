@@ -104,4 +104,4 @@ A third group does not arise at all in a Textual application: the terminal guard
 ratada has each of these; termz has none of them.
 
 - [x] `CLAUDE.md` with the project-specific conventions.
-- [ ] `docs/` holding `DEVELOPMENT.md` and a `CLEAN-UP.md` walkthrough checklist.
+- [x] `docs/` holding `DEVELOPMENT.md` and a `CLEAN-UP.md` walkthrough checklist. Done, modelled on ratada's rather than termplate's: termplate's DEVELOPMENT.md is a signpost because `_TEMPLATE_GUIDE.md` carries everything, and termz has no such document. `tests/test_docs.py` came with them, which is what turned up the six horizontal rules in the README that section 1.5.1 forbids.

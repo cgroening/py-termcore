@@ -25,8 +25,6 @@ Terminal utilities for CLI, TUI, IO and general use.
 pip install termz
 ```
 
----
-
 ## termz.cli – Styled CLI Output
 
 Provides helpers for printing color-coded panels using Rich and for clearing terminal output.
@@ -55,8 +53,6 @@ clear_lines(4)
 | `print_custom_panel(formatted_message, panel_color)` | Panel with pre-formatted Rich markup |
 | `clear_lines(count)` | Move cursor up `count` lines and clear everything below |
 | `get_console()` | Returns the shared Rich `Console` instance |
-
----
 
 ## termz.tui – Textual TUI Helpers
 
@@ -243,8 +239,6 @@ def check_action(self, action, parameters):
     return bindings.handle_check_action(action, parameters, active_group=self.active_tab)
 ```
 
----
-
 ## termz.io – IO Utilities
 
 ### AppStateStorage
@@ -343,8 +337,6 @@ content = Textfile.read("notes.txt")
 lines   = Textfile.readlines("notes.txt")
 Textfile.write("notes.txt", "New content")
 ```
-
----
 
 ## termz.util – General Utilities
 
@@ -462,8 +454,6 @@ def heavy_computation():
 
 The decorators log at debug level rather than printing, so enable that logger to see them.
 
----
-
 ## Development
 
 ```zsh
@@ -477,8 +467,6 @@ pytest           # tests, with coverage
 ```
 
 The ruff formatter is deliberately not configured: line breaking is hand-made and the 80-column limit is enforced by `E501`.
-
----
 
 ## License
 
