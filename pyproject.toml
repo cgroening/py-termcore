@@ -61,7 +61,7 @@ branch = true
 show_missing = true
 # Holds the current level. Coverage that enforces nothing is decoration.
 # Raised with every module that gains tests (see TODO.md, section "Tests").
-fail_under = 39
+fail_under = 70
 
 [tool.pyright]
 exclude = [

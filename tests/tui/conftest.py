@@ -15,6 +15,23 @@ _THEME_MODULE = dedent(
 ).lstrip()
 
 MakeTheme = Callable[..., Path]
+WriteBindings = Callable[[str], str]
+
+
+@pytest.fixture
+def write_bindings(tmp_path: Path) -> WriteBindings:
+    """
+    Returns a factory that writes a bindings YAML file and returns its path.
+
+    The factory takes the YAML as text rather than as a dict, because how the
+    file is written is exactly what several of these tests are about.
+    """
+    def _write_bindings(yaml_text: str) -> str:
+        path = tmp_path / "bindings.yaml"
+        path.write_text(dedent(yaml_text).lstrip(), encoding="utf-8")
+        return str(path)
+
+    return _write_bindings
 
 
 @pytest.fixture

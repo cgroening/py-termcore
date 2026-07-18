@@ -271,6 +271,8 @@ Because `AppStateStorage` is a singleton, subsequent calls to `AppStateStorage()
 
 A lightweight SQLite abstraction.
 
+Values are always bound as query parameters, never formatted into the statement, so a value can never be read as SQL. Identifiers cannot be parameters, so a table or column name is checked against the schema of the open database and quoted before it is used; a name that is not part of the schema raises `UnknownIdentifierError` instead of reaching the database. `update` and `remove` refuse an empty condition list with `EmptyConditionsError` rather than rewriting or emptying the whole table.
+
 ```python
 from termz import Database, Condition, SQLComparisonOperator, SQLOrderByDirection, ColumnOrder
 
@@ -289,19 +291,23 @@ with Database("data.db") as db:
     # Insert
     inserted = db.insert("tasks", [{"title": "Buy milk", "done": 0}])
 
-    # Update
-    db.update("tasks", [{
-        "done": 1,
-        "@conds": [Condition("id", SQLComparisonOperator.EQ, inserted[0]["id"])],
-    }])
+    # Update - returns the number of changed rows
+    changed = db.update(
+        "tasks",
+        {"done": 1},
+        [Condition("id", SQLComparisonOperator.EQ, inserted[0]["id"])],
+    )
 
     # Delete
     db.remove("tasks", [Condition("id", SQLComparisonOperator.EQ, 42)])
 
-    # Raw SQL
+    # Raw SQL - pass values through params, never format them into the string
     db.query("CREATE TABLE IF NOT EXISTS tasks (id INTEGER PRIMARY KEY, title TEXT, done INTEGER)")
+    db.query("INSERT INTO tasks (title) VALUES (?)", ["Buy bread"])
     db.save()
 ```
+
+Leaving the `with` block commits, unless it is left through an exception, in which case the transaction is rolled back. Available comparison operators are `LT`, `LE`, `EQ`, `NE`, `GE`, `GT`, `LIKE`, `IS_NULL` and `IS_NOT_NULL`; the last two take no value.
 
 ### File
 
@@ -384,11 +390,18 @@ s_today  = today_date()                        # "02.04.2026"
 ### String
 
 ```python
-from termz import linewrap, charpos
+from termz import linewrap, charpos, str_with_fixed_width
 
 wrapped = linewrap("A long piece of text that should be wrapped.", linewidth=20)
 positions = charpos("hello world", "l")  # [2, 3, 9]
+
+# Exactly `width` characters, truncated with an ellipsis or padded
+str_with_fixed_width("a long value", 8)             # "a long …"
+str_with_fixed_width("a long value", 8, "right")    # "…g value"
+str_with_fixed_width("ok", 8, "center")             # "   ok   "
 ```
+
+The width is counted in characters, not in terminal cells, so text containing full-width characters renders wider than requested.
 
 ### Index Navigation
 
@@ -396,11 +409,14 @@ positions = charpos("hello world", "l")  # [2, 3, 9]
 from termz import next_index
 
 # Navigate a list of 5 items, wrapping around at edges
-idx = next_index(current_index=4, max_index=5, direction=1)  # 0  (wraps)
-idx = next_index(current_index=0, max_index=5, direction=-1) # 4  (wraps)
+idx = next_index(current_index=4, length=5, direction=1)  # 0  (wraps)
+idx = next_index(current_index=0, length=5, direction=-1) # 4  (wraps)
 
 # Clamp at boundaries instead of wrapping
-idx = next_index(current_index=4, max_index=5, direction=1, loop_behavior=False)  # 4
+idx = next_index(current_index=4, length=5, direction=1, loop_behavior=False)  # 4
+
+# An empty list has no valid index
+idx = next_index(current_index=0, length=0)  # 0
 ```
 
 ### Validation

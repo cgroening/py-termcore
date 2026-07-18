@@ -6,16 +6,18 @@ termz is the foundation under termplate. That ordering matters for how this list
 
 ## Tests
 
-The pytest, coverage and dev-dependency setup now exists, and `termz/tui/theme_loader.py` is covered. Everything else is still untested, and the coverage gate in `pyproject.toml` merely holds the level reached so far – raise `fail_under` with every module that gains tests.
+Every module named below is covered now, and the suite has grown from nothing to a little over 70 % of the package. What is left untested is the rest: `cli/output.py`, the custom widgets, `io/app_state_storage.py`, `io/file.py`, `io/textfile.py` and the remaining `util` modules. The coverage gate in `pyproject.toml` holds the level reached so far – raise `fail_under` with every module that gains tests.
+
+Writing these suites produced the same result every time: each module had to be fixed before it could be meaningfully tested. That pattern is the argument for the remaining entries, not against them.
 
 The practical consequence was already documented before the first test existed: of the four theme bugs that held up termplate, three lived in `termz/tui/theme_loader.py`, and each of them would have been caught by one test. Writing that suite immediately surfaced a fifth and a sixth defect that nobody had noticed.
 
 Ordered by how much a test would buy:
 
 - [x] `termz/tui/theme_loader.py` – the module with the most silent behaviour and all four known bugs: theme discovery, name prefixing, CSS resolution, persistence and cycling. Nothing here fails loudly when it goes wrong; it just renders the wrong colours.
-- [ ] `termz/tui/custom_bindings.py` – the group and prefix contract (`_global`, `<name>_tab`, `<name>_screen`) that every derived app depends on and that no consumer can verify from the outside.
-- [ ] `termz/io/database.py` – it assembles SQL strings. That is pure, side-effect-light logic and therefore the cheapest meaningful coverage in the repository.
-- [ ] `termz/util/datetime.py`, `termz/util/index.py`, `termz/util/string.py` – pure functions with obvious edge cases (empty input, boundaries, wrapping).
+- [x] `termz/tui/custom_bindings.py` – the group and prefix contract (`_global`, `<name>_tab`, `<name>_screen`) that every derived app depends on and that no consumer can verify from the outside.
+- [x] `termz/io/database.py` – it assembles SQL strings. That is pure, side-effect-light logic and therefore the cheapest meaningful coverage in the repository.
+- [x] `termz/util/datetime.py`, `termz/util/index.py`, `termz/util/string.py` – pure functions with obvious edge cases (empty input, boundaries, wrapping).
 
 ## Tooling
 
@@ -41,6 +43,26 @@ Noticed while fixing the above, deliberately left alone to keep that change focu
 - [ ] `set_previous_theme_in_textual_app` silently does nothing when the stored theme is not registered – a theme removed between two runs leaves the app on Textual's default rather than on the `default_theme_name` the caller passed, and says so in neither the log nor the return value. It should fall back to the default explicitly and report it.
 - [ ] `include_standard_themes: bool` and `_load_themes(standard_themes: bool)` are flag arguments, which section 1.1.2 of the style guide forbids. Changing the first is a breaking API change and belongs with a release.
 - [ ] `_apply_stylesheet` calls `app.stylesheet.reparse()` unguarded, so a theme shipping invalid TCSS takes the whole application down. Decide whether that should be reported and skipped instead – failing loudly may well be right, but it should be a decision rather than an accident.
+
+## Further findings in CustomBindings
+
+Noticed while writing its tests, deliberately left alone to keep that change focused.
+
+- [ ] A binding missing `key`, `action` or `description` is dropped silently. Nothing is logged, so a typo in `bindings.yaml` costs a shortcut and says nothing.
+- [ ] Two groups declaring the same action name both land in `action_to_groups`, but `action_row_map` keeps only the last one – the earlier binding silently moves to the other footer row.
+- [ ] `get_bindings` with a `tab_name` or `screen_name` that matches no group returns just the globals instead of complaining, so a typo looks like a tab with no shortcuts.
+- [ ] `show`, `priority` and `system` are read with `bool(...)`, so the YAML string `"false"` is `True`. Only an unquoted `false` behaves as written.
+- [ ] `_parse_key_display` overrides an explicitly declared `key_display` for function keys, and returns `None` rather than the key when neither applies, contrary to what its docstring said.
+
+## Further findings in the util modules
+
+- [ ] `date_diff` divides by 86400, so a difference of one second in the wrong direction reports -1 days, and any span crossing a daylight saving switch is off by one. Deciding between "whole 24-hour periods" and "calendar days apart" is a semantic choice, not a bug fix.
+- [ ] `str_with_fixed_width` counts code points, not terminal cells. CJK text and emoji therefore render wider than the requested width, which defeats the purpose of the function. Fixing it properly needs an East-Asian-width table, and section 1.2.7 requires asking before adding a dependency.
+- [ ] Only `util/datetime.py` declares `__all__`, and only because its star-export shadowed the submodule itself. Every other module leaks its imports into the package namespace – `termz.io.database` exports `sqlite3`, `Enum` and `TracebackType`, for instance. Section 1.2.6 asks for a small public interface; this is the opposite.
+
+## Duplication with pylightlib
+
+- [ ] `termz/io/database.py` began as a copy of `pylightlib/pylightlib/io/Database.py` and the two have now diverged sharply: only the termz copy has parameterised queries, an identifier whitelist and tests. The predecessor still ships the version with every one of the defects listed in the changelog. Decide whether pylightlib should take this version over, or whether that module should be retired there.
 
 ## Release
 
