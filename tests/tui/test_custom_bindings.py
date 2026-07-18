@@ -11,7 +11,6 @@ from collections.abc import Sequence
 from textual.binding import Binding
 
 from termz.tui.custom_bindings import CustomBindings
-
 from tests.tui.conftest import WriteBindings
 
 BINDINGS = """
@@ -115,7 +114,7 @@ class TestActionPrefixing:
     ) -> None:
         bindings = CustomBindings(write_bindings(BINDINGS))
 
-        assert "cancel" in actions(bindings.get_bindings(screen_name="add"))
+        assert "cancel" in actions(bindings.get_screen_bindings("add"))
 
     def test_any_group_that_is_neither_prefixes_the_action(
         self, write_bindings: WriteBindings
@@ -248,10 +247,10 @@ class TestGetBindings:
         self, write_bindings: WriteBindings
     ) -> None:
         # A screen name implies the screen context, so the globals arrive
-        # prefixed even without passing for_screen.
+        # prefixed: a screen name implies the screen context.
         bindings = CustomBindings(write_bindings(BINDINGS))
 
-        assert actions(bindings.get_bindings(screen_name="add")) == [
+        assert actions(bindings.get_screen_bindings("add")) == [
             "cancel", "app.quit"
         ]
 
@@ -261,16 +260,16 @@ class TestGetBindings:
 
         assert actions(bindings.get_bindings())[-1] == "quit"
 
-    def test_for_screen_dispatches_globals_on_the_app(
+    def test_screen_bindings_dispatch_globals_on_the_app(
         self, write_bindings: WriteBindings
     ) -> None:
         # Without the app. prefix a Screen would look for action_quit on
         # itself, find nothing, and the key would quietly do nothing.
         bindings = CustomBindings(write_bindings(BINDINGS))
 
-        assert "app.quit" in actions(bindings.get_bindings(for_screen=True))
+        assert "app.quit" in actions(bindings.get_screen_bindings())
 
-    def test_without_for_screen_globals_are_unprefixed(
+    def test_app_bindings_leave_globals_unprefixed(
         self, write_bindings: WriteBindings
     ) -> None:
         bindings = CustomBindings(write_bindings(BINDINGS))
@@ -282,8 +281,8 @@ class TestGetBindings:
     ) -> None:
         bindings = CustomBindings(write_bindings(BINDINGS))
 
-        bindings.get_bindings(for_screen=True)
-        second = bindings.get_bindings(for_screen=True)
+        bindings.get_screen_bindings()
+        second = bindings.get_screen_bindings()
 
         assert "app.quit" in actions(second)
         assert "app.app.quit" not in actions(second)
@@ -292,7 +291,7 @@ class TestGetBindings:
         self, write_bindings: WriteBindings
     ) -> None:
         # Plain string sorting would put f10 before f2.
-        bindings = CustomBindings(write_bindings("""
+        bindings = CustomBindings.sorted_by_key(write_bindings("""
             _global:
               - key: f10
                 action: ten
@@ -300,7 +299,7 @@ class TestGetBindings:
               - key: f2
                 action: two
                 description: Two
-        """), sort_alphabetically=True)
+        """))
 
         assert actions(bindings.get_bindings()) == ["two", "ten"]
 
@@ -320,19 +319,19 @@ class TestGetRowMap:
 
         assert bindings.get_row_map()["tasks_tab_add"] == 0
 
-    def test_for_screen_prefixes_the_globals(
+    def test_the_screen_row_map_prefixes_the_globals(
         self, write_bindings: WriteBindings
     ) -> None:
         bindings = CustomBindings(write_bindings(BINDINGS))
 
-        assert "app.quit" in bindings.get_row_map(for_screen=True)
+        assert "app.quit" in bindings.get_screen_row_map()
 
-    def test_for_screen_leaves_tab_actions_alone(
+    def test_the_screen_row_map_leaves_tab_actions_alone(
         self, write_bindings: WriteBindings
     ) -> None:
         bindings = CustomBindings(write_bindings(BINDINGS))
 
-        assert "tasks_tab_add" in bindings.get_row_map(for_screen=True)
+        assert "tasks_tab_add" in bindings.get_screen_row_map()
 
     def test_the_row_map_keys_match_the_binding_actions(
         self, write_bindings: WriteBindings
@@ -340,9 +339,9 @@ class TestGetRowMap:
         # The footer looks its rows up by action name. If the two disagree
         # about the app. prefix, every global silently loses its row.
         bindings = CustomBindings(write_bindings(BINDINGS))
-        row_map = bindings.get_row_map(for_screen=True)
+        row_map = bindings.get_screen_row_map()
 
-        for action in actions(bindings.get_bindings(for_screen=True)):
+        for action in actions(bindings.get_screen_bindings()):
             assert action in row_map
 
 

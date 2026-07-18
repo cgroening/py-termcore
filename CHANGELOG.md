@@ -13,6 +13,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Test suites for `tui/custom_bindings.py`, `io/database.py`, `util/datetime.py`, `util/index.py` and `util/string.py`, which completes the list of modules named in `TODO.md`
 - `io/errors.py`: `DatabaseError` and its two subclasses `UnknownIdentifierError` and `EmptyConditionsError`, the project's first domain exceptions
 - `SQLComparisonOperator`: `NE`, `LIKE`, `IS_NULL` and `IS_NOT_NULL`. There was previously no way to express "not equal" at all
+- `py.typed`. Without the marker a consumer's type checker treated the whole package as untyped and degraded every import to `Any`
+- A `[tool.ruff]` section with the rule set from section 3.2.1 of the style guide, and `typeCheckingMode = "strict"` for basedpyright. The library was previously linted on ruff's defaults, which select no rules and enforce no line length
+- `io/errors.py`: `AppStateError` and `StateFileError`
+- `termz/tui/custom_widgets/__init__.py`. The directory was an implicit namespace package, which is one packaging tool away from being dropped from the wheel entirely
+- `clamped_index`, `timing_ns`, `File.folder_content_recursive`, `ThemeLoader.custom_only`, `CustomBindings.sorted_by_key`, `CustomBindings.get_screen_bindings` and `CustomBindings.get_screen_row_map`, each replacing a boolean parameter (section 1.1.2)
+- `DateFormat`, an enum replacing the `english_format` flag of the datetime helpers
 
 ### Changed
 
@@ -30,6 +36,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `next_index`: The `max_index` parameter is now called `length`. It was a length in both the code and the docstring, and the old name invited an off-by-one
 - `util/datetime`: Every conversion states the local time zone instead of leaving it implied. Results are unchanged on a given machine
 - `str_with_fixed_width`: The alignment is validated before the text length is looked at, so an invalid value is rejected either way
+- Every boolean parameter that selected behaviour is gone, replaced by a second named function, a factory or an enum: `next_index(loop_behavior=)`, `timing(use_ns_timer=)`, `File.folder_content(withsubfolders=)`, `ThemeLoader(include_standard_themes=)`, `CustomBindings(sort_alphabetically=)`, `get_bindings(for_screen=)`, `get_row_map(for_screen=)` and `english_format=` on the five datetime helpers. All of these are breaking
+- `AppStateStorage`: A failure to read, create or write the state file raises `StateFileError` instead of printing a message and calling `sys.exit()`. A library taking the whole process down left the caller no way to react
+- `termz.util.debug`: The decorators log at debug level through a module logger instead of printing to stdout
+- File and directory handling moved from `os.path` to `pathlib` throughout
 
 ### Fixed
 
@@ -50,12 +60,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `ThemeLoader`: A theme without a stylesheet, and any theme not registered by termz such as Textual's built-ins, logged a warning during entirely normal use. This is reported at debug level now
 - `ThemeLoader`: Diagnostics went to the root logger and surfaced as `WARNING:root:` in every consumer; they now use a module logger and lazy formatting
 - `ThemeLoader`: Two theme folders declaring the same name silently overwrote each other; the second is now refused with an error
+- `Singleton`: The metaclass reported `object` as the type of every instance it built, so a consumer type-checking against a singleton got no type at all. It now reports the class it constructed
+- `CustomDataTable.flexible_columns` and `AppStateStorage._json_dict` were class attributes with mutable defaults, so every instance in a process shared one object. Same defect as in `ThemeLoader` and `CustomBindings`
+- `File.change_extension` printed the split file name to stdout, a debug statement left in a pure function
+- A message in `AppStateStorage` was in German, against the rule that all visible text is English
 
 ### Removed
 
 - `Database.tostr`: Values are parameters now, so the method had no purpose left; leaving it would have invited hand-built statements
 - `Database.update` no longer accepts the list-of-dictionaries form with an `@`-prefixed conditions key
 - `CustomBindings._action_belongs_to_group`: Never called
+- Commented-out code in `CustomBindings` and `CustomDataTable`
+- Two of the six blanket pyright suppressions, after measuring that they report nothing in either checking mode
 
 ## [0.1.1] – 2026-04-07
 

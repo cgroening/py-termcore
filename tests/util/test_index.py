@@ -1,6 +1,6 @@
 """Tests for the index arithmetic behind cyclic list navigation."""
 
-from termz.util.index import next_index
+from termz.util.index import clamped_index, next_index
 
 
 class TestCyclicMovement:
@@ -28,24 +28,24 @@ class TestCyclicMovement:
 
 class TestClampedMovement:
     def test_stops_at_the_end(self) -> None:
-        assert next_index(4, 5, loop_behavior=False) == 4
+        assert clamped_index(4, 5) == 4
 
     def test_stops_at_the_start(self) -> None:
-        assert next_index(0, 5, direction=-1, loop_behavior=False) == 0
+        assert clamped_index(0, 5, direction=-1) == 0
 
     def test_moves_within_the_list(self) -> None:
-        assert next_index(2, 5, loop_behavior=False) == 3
+        assert clamped_index(2, 5) == 3
 
     def test_honours_the_step_size(self) -> None:
         # Used to hard-code a single step here while the looping branch
         # honoured `direction`, so the two disagreed for any larger step.
-        assert next_index(0, 10, direction=5, loop_behavior=False) == 5
+        assert clamped_index(0, 10, direction=5) == 5
 
     def test_a_step_past_the_end_is_clamped(self) -> None:
-        assert next_index(8, 10, direction=5, loop_behavior=False) == 9
+        assert clamped_index(8, 10, direction=5) == 9
 
     def test_a_step_past_the_start_is_clamped(self) -> None:
-        assert next_index(1, 10, direction=-5, loop_behavior=False) == 0
+        assert clamped_index(1, 10, direction=-5) == 0
 
 
 class TestEmptyList:
@@ -59,7 +59,7 @@ class TestEmptyList:
         assert next_index(0, 0) == 0
 
     def test_clamped_yields_zero(self) -> None:
-        assert next_index(0, 0, loop_behavior=False) == 0
+        assert clamped_index(0, 0) == 0
 
     def test_backward_yields_zero(self) -> None:
         assert next_index(0, 0, direction=-1) == 0

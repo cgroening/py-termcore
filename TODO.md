@@ -21,9 +21,9 @@ Ordered by how much a test would buy:
 
 ## Tooling
 
-- [ ] There is no `[tool.ruff]` section in `pyproject.toml`, so ruff runs on its defaults: no line length, no rule selection. Adopt the baseline from section 3.2.1 of the style guide, the one termplate already runs green.
-- [ ] `[tool.pyright]` sets six blanket suppressions and no `typeCheckingMode` at all, so the library is not even checked in strict mode. The guide requires strict. Set it, then review each suppression individually and leave a comment on every one that stays.
-- [ ] `py.typed` is missing. Without that marker a consumer's type checker treats the whole package as untyped and silently degrades every import to `Any` – including termplate, which otherwise runs strict basedpyright. Add the file and ship it via `package-data`.
+- [x] There is no `[tool.ruff]` section in `pyproject.toml`, so ruff runs on its defaults: no line length, no rule selection. Adopt the baseline from section 3.2.1 of the style guide, the one termplate already runs green. Done: the rule set reported 531 violations on adoption and `ruff check .` is green now. The formatter is deliberately left unconfigured - it would have rewritten 41 of 55 files for no behavioural gain, and `E501` enforces the column limit.
+- [x] `[tool.pyright]` sets six blanket suppressions and no `typeCheckingMode` at all, so the library is not even checked in strict mode. The guide requires strict. Set it, then review each suppression individually and leave a comment on every one that stays. Done, with a correction to the premise: basedpyright's own default is `recommended`, which is stricter than `strict`, so the library was already being checked more strictly than the guide asks. Setting `strict` states the contract and is what a consumer running plain pyright needs. Two suppressions were deleted after measuring that they report nothing in either mode; the four that stayed carry a comment each.
+- [x] `py.typed` is missing. Without that marker a consumer's type checker treats the whole package as untyped and silently degrades every import to `Any` – including termplate, which otherwise runs strict basedpyright. Add the file and ship it via `package-data`. Done; no `package-data` entry was needed, since hatchling ships everything inside the package directory. Verified in the built wheel. The marker immediately earned itself: with termz typed, termplate's checker found that `Singleton` reported `object` for every instance it built.
 
 ## Bugs found while hardening termplate
 
@@ -109,5 +109,3 @@ ratada has each of these; termz has none of them.
 
 - [ ] `CLAUDE.md` with the project-specific conventions.
 - [ ] `docs/` holding `DEVELOPMENT.md` and a `CLEAN-UP.md` walkthrough checklist.
-- [ ] `CONTRIBUTING.md` naming the merge gates.
-- [ ] `examples/` with a runnable demonstration per major widget. The README carries snippets, but nothing that can be executed.

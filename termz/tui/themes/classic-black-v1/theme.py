@@ -1,6 +1,5 @@
 from textual.theme import Theme
 
-
 TEXTUAL_THEME = Theme(
     name="classic-black-v1",
     primary="#7CA6C2",

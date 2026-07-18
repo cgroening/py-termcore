@@ -1,28 +1,42 @@
+"""The metaclass implementing the singleton pattern."""
+
+from typing import Any, cast
+
+# Keyed by class, so that two classes using this metaclass keep their own
+# instance. Holding the registry here rather than on the metaclass is also
+# what lets __call__ report the constructed class as its return type.
+_instances: dict[type, object] = {}
+
+
 class Singleton(type):
     """
     Metaclass for the singleton pattern.
 
-    Ensures that a class has only one instance and provides global access to it.
-
-    Attributes
-    ----------
-    _instance : object or None
-        The single instance of the class, or None if not yet created.
+    Ensures that a class has only one instance and provides global access
+    to it.
 
     Examples
     --------
     >>> class SomeClass(metaclass=Singleton):
-    ...     def __init__(self):
-    ...         pass
+    ...     pass
+    >>> SomeClass() is SomeClass()
+    True
     """
 
-    _instance = None
+    def __call__[T](cls: type[T], *args: Any, **kwargs: Any) -> T:  # noqa: ANN401
+        """
+        Returns the one instance, building it on the first call.
 
-    def __call__(cls, *args, **kwargs):  # pyright: ignore[reportAny, reportUnknownParameterType, reportMissingParameterType]
-        if cls._instance is None:
-            cls._instance = super(Singleton, cls).__call__(*args, **kwargs)  # pyright: ignore[reportAny]
-        return cls._instance  # pyright: ignore[reportAny]
+        The arguments are whatever the class itself takes, which is what Any
+        says here. The return type is the class, so that a consumer sees the
+        type it asked for instead of `object`.
+        """
+        if cls not in _instances:
+            _instances[cls] = super().__call__(*args, **kwargs)  # pyright: ignore[reportAny]
+
+        return cast("T", _instances[cls])
 
     @property
-    def instance(self):
-        return self._instance
+    def instance(cls) -> object | None:
+        """Returns the single instance, or None before it was built."""
+        return _instances.get(cls)

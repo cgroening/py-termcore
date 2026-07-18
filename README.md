@@ -74,10 +74,8 @@ termz ships 16 built-in themes:
 from pathlib import Path
 from termz import ThemeLoader
 
-loader = ThemeLoader(
-    theme_folder="themes",           # optional: path to custom themes
-    include_standard_themes=True,    # include built-in termz themes
-)
+loader = ThemeLoader("themes")              # bundled themes plus that folder
+loader = ThemeLoader.custom_only("themes")  # only that folder
 
 # In your Textual App.on_mount():
 loader.register_themes_in_textual_app(app)
@@ -224,15 +222,21 @@ add_screen:
 ```python
 from termz.tui.custom_bindings import CustomBindings
 
-bindings = CustomBindings('bindings.yaml', sort_alphabetically=False)
+bindings = CustomBindings("bindings.yaml")                 # file order
+bindings = CustomBindings.sorted_by_key("bindings.yaml")   # sorted by key
 
 # In your App or Screen:
-BINDINGS = bindings.get_bindings()                        # all bindings
-BINDINGS = bindings.get_bindings(tab_name='tasks_tab')    # tab-specific + global
-BINDINGS = bindings.get_bindings(screen_name='add')       # screen-specific + global
+# On the App: globals dispatch as declared
+BINDINGS = bindings.get_bindings()                      # every tab + global
+BINDINGS = bindings.get_bindings(tab_name="tasks_tab")  # one tab + global
+
+# On a Screen: globals are prefixed with `app.` so they dispatch on the App
+BINDINGS = bindings.get_screen_bindings()               # every tab + global
+BINDINGS = bindings.get_screen_bindings("add")          # that screen + global
 
 # Row map for MultiLineFooter(auto_wrap=False):
-row_map = bindings.get_row_map()
+row_map = bindings.get_row_map()         # pair with get_bindings
+row_map = bindings.get_screen_row_map()  # pair with get_screen_bindings
 
 # In check_action to hide tab bindings that don't belong to the active tab:
 def check_action(self, action, parameters):
@@ -373,13 +377,13 @@ assert a is b  # True
 ### Datetime
 
 ```python
-from termz import timestamp_to_date, date_to_timestamp, date_diff, today_timestamp, today_date
+from termz import DateFormat, timestamp_to_date, date_to_timestamp, date_diff, today_timestamp, today_date
 
 ts = date_to_timestamp("01.04.2025")           # German format (default)
-ts = date_to_timestamp("2025-04-01", english_format=True)
+ts = date_to_timestamp("2025-04-01", DateFormat.ISO)
 
 s  = timestamp_to_date(ts)                     # "01.04.2025"
-s  = timestamp_to_date(ts, english_format=True) # "2025-04-01"
+s  = timestamp_to_date(ts, DateFormat.ISO)     # "2025-04-01"
 
 days = date_diff(ts1, ts2)                     # difference in days
 
@@ -406,14 +410,14 @@ The width is counted in characters, not in terminal cells, so text containing fu
 ### Index Navigation
 
 ```python
-from termz import next_index
+from termz import next_index, clamped_index
 
 # Navigate a list of 5 items, wrapping around at edges
 idx = next_index(current_index=4, length=5, direction=1)  # 0  (wraps)
 idx = next_index(current_index=0, length=5, direction=-1) # 4  (wraps)
 
-# Clamp at boundaries instead of wrapping
-idx = next_index(current_index=4, length=5, direction=1, loop_behavior=False)  # 4
+# Clamp at the boundaries instead of wrapping
+idx = clamped_index(current_index=4, length=5, direction=1)  # 4
 
 # An empty list has no valid index
 idx = next_index(current_index=0, length=0)  # 0
@@ -432,24 +436,43 @@ is_number(None)    # False
 ### Debug Decorators
 
 ```python
-from termz import print_arguments, timing
+from termz import print_arguments, timing, timing_ns
 
 @print_arguments
 def add(a: int, b: int) -> int:
     return a + b
 
 add(3, 5)
-# Function add called
-# Args: (3, 5)
-# Kwargs: {}
-# Function add returns: 8
+# Logged at debug level on the `termz.util.debug` logger:
+#   Function add called
+#   Args: (3, 5)
+#   Kwargs: {}
+#   Function add returns: 8
 
 
-@timing()                  # seconds
-@timing(use_ns_timer=True) # nanoseconds
+@timing()     # seconds
+@timing_ns()  # nanoseconds
 def heavy_computation():
     ...
 ```
+
+The decorators log at debug level rather than printing, so enable that logger to see them.
+
+---
+
+## Development
+
+```zsh
+uv venv
+source .venv/bin/activate
+uv pip install -e ".[dev]"
+
+ruff check .     # linting; the rule set is the style guide's baseline
+basedpyright     # strict type checking
+pytest           # tests, with coverage
+```
+
+The ruff formatter is deliberately not configured: line breaking is hand-made and the 80-column limit is enforced by `E501`.
 
 ---
 

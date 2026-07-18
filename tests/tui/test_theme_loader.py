@@ -20,7 +20,6 @@ from termz.tui.theme_loader import (
     STANDARD_THEMES_DIR,
     ThemeLoader,
 )
-
 from tests.tui.conftest import MakeTheme
 
 CSS = "Screen { background: #101010; }"
@@ -56,9 +55,7 @@ def loaded_css_paths(app: App[None]) -> set[Path]:
 
 def custom_loader(theme_root: Path) -> ThemeLoader:
     """Returns a loader for a custom theme folder, without termz's own."""
-    return ThemeLoader(
-        theme_folder=str(theme_root), include_standard_themes=False
-    )
+    return ThemeLoader.custom_only(str(theme_root))
 
 
 class TestThemeRegistryIsPerInstance:
@@ -164,13 +161,11 @@ class TestRegistrationIsRepeatable:
         # Registering under one prefix must leave the theme untouched for a
         # loader that registers the same folder under another.
         make_theme(theme_root, "solar")
-        first = ThemeLoader(
-            theme_folder=str(theme_root), include_standard_themes=False,
-            custom_theme_prefix="ONE_"
+        first = ThemeLoader.custom_only(
+            str(theme_root), custom_theme_prefix="ONE_"
         )
-        second = ThemeLoader(
-            theme_folder=str(theme_root), include_standard_themes=False,
-            custom_theme_prefix="TWO_"
+        second = ThemeLoader.custom_only(
+            str(theme_root), custom_theme_prefix="TWO_"
         )
         first.register_themes_in_textual_app(App())
 
@@ -439,7 +434,7 @@ class TestStylesheetLoading:
 class TestThemePersistence:
     def test_a_saved_theme_is_read_back(self, tmp_path: Path) -> None:
         config = tmp_path / "theme.json"
-        loader = ThemeLoader(include_standard_themes=False)
+        loader = ThemeLoader.custom_only(str(tmp_path / "none"))
 
         loader.save_theme_to_config("CUSTOM_solar", config)
 
@@ -449,7 +444,7 @@ class TestThemePersistence:
     def test_a_missing_config_file_yields_the_default(
         self, tmp_path: Path
     ) -> None:
-        loader = ThemeLoader(include_standard_themes=False)
+        loader = ThemeLoader.custom_only(str(tmp_path / "none"))
 
         assert loader.get_previously_used_theme(
             tmp_path / "absent.json", "fallback"
@@ -458,7 +453,7 @@ class TestThemePersistence:
     def test_invalid_json_yields_the_default(self, tmp_path: Path) -> None:
         config = tmp_path / "theme.json"
         config.write_text("{ not json", encoding="utf-8")
-        loader = ThemeLoader(include_standard_themes=False)
+        loader = ThemeLoader.custom_only(str(tmp_path / "none"))
 
         assert loader.get_previously_used_theme(config, "fallback") \
             == "fallback"
@@ -468,7 +463,7 @@ class TestThemePersistence:
     ) -> None:
         config = tmp_path / "theme.json"
         config.write_text(json.dumps({"other": "value"}), encoding="utf-8")
-        loader = ThemeLoader(include_standard_themes=False)
+        loader = ThemeLoader.custom_only(str(tmp_path / "none"))
 
         with caplog.at_level(logging.WARNING):
             result = loader.get_previously_used_theme(config, "fallback")
@@ -482,7 +477,7 @@ class TestThemePersistence:
         # A directory where the config file belongs: open() cannot write it.
         config = tmp_path / "theme.json"
         config.mkdir()
-        loader = ThemeLoader(include_standard_themes=False)
+        loader = ThemeLoader.custom_only(str(tmp_path / "none"))
 
         with caplog.at_level(logging.ERROR):
             loader.save_theme_to_config("CUSTOM_solar", config)
@@ -534,7 +529,7 @@ class TestThemeCycling:
 
             loader.change_to_next_or_previous_theme(1, app)
 
-            assert app.theme == list(app.available_themes)[0]
+            assert app.theme == next(iter(app.available_themes))
 
     async def test_the_previous_theme_wraps_at_the_start(
         self, theme_root: Path, make_theme: MakeTheme
@@ -545,7 +540,7 @@ class TestThemeCycling:
 
         async with app.run_test():
             loader.register_themes_in_textual_app(app)
-            app.theme = list(app.available_themes)[0]
+            app.theme = next(iter(app.available_themes))
 
             loader.change_to_next_or_previous_theme(-1, app)
 

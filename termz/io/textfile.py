@@ -1,9 +1,5 @@
 """
-termz.io.textfile
-=================
-
-A utility module for handling text file operations, including reading and
-writing.
+Reading and writing text files.
 
 This module provides a convenient interface for working with text files,
 allowing users to read entire file contents, retrieve lines as a list,
@@ -22,11 +18,12 @@ Features:
 - Ensures proper file handling by automatically closing files after operations.
 """
 
+from pathlib import Path
+
 
 class Textfile:
     """
-    A utility class for handling text file operations such as reading
-    and writing.
+    Reads and writes text files.
 
     This class provides methods to read the entire content of a text file,
     read individual lines, and write new content to the file. It is designed for
@@ -37,7 +34,7 @@ class Textfile:
     @staticmethod
     def readlines(path: str) -> list[str]:
         """
-        Reads all lines from the text file and returns them as a list of strings.
+        Reads the text file and returns its lines as a list.
 
         Parameters
         ----------
@@ -49,13 +46,13 @@ class Textfile:
         list[str]
             A list containing all lines from the text file.
         """
-        with open(path, "r+") as f:
+        with Path(path).open("r+", encoding="utf-8") as f:
             return f.readlines()
 
     @staticmethod
     def read(path: str) -> str:
         """
-        Reads the entire content of the text file and returns it as a single string.
+        Reads the whole text file into a single string.
 
         Parameters
         ----------
@@ -67,7 +64,7 @@ class Textfile:
         str
             The complete content of the text file as a string.
         """
-        with open(path, "r+") as f:
+        with Path(path).open("r+", encoding="utf-8") as f:
             return f.read()
 
     @staticmethod
@@ -85,7 +82,7 @@ class Textfile:
         text : str
             Content of the text file.
         """
-        with open(path, "w") as f:
+        with Path(path).open("w", encoding="utf-8") as f:
             f.seek(0)               # Set stream to the beginning of the file
             f.write("".join(text))  # Write text to file
             f.truncate()            # Remove old text

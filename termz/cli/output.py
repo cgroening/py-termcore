@@ -1,16 +1,13 @@
 """
-termz.cli.output
-================
-
 Provides utility functions for styled CLI output using Rich.
 
 Includes helpers for printing color-coded panels (error, warning, success and
 info) and a function to clear previously printed lines from the terminal.
 """
 import sys
+
 from rich.console import Console
 from rich.panel import Panel
-
 
 console = Console()
 
@@ -37,7 +34,7 @@ def print_success(message: str) -> None:
 
 def print_info(message: str) -> None:
     """Prints an info message in a cyan panel using Rich."""
-    print_panel(f"ℹ {message}", "cyan")
+    print_panel(f"ℹ {message}", "cyan")  # noqa: RUF001 - the glyph is the icon
 
 
 def print_panel(message: str, color: str) -> None:
@@ -47,10 +44,7 @@ def print_panel(message: str, color: str) -> None:
 
 
 def print_custom_panel(formatted_message: str, panel_color: str) -> None:
-    """
-    Prints a custom formatted message in a panel with the given color
-    using Rich.
-    """
+    """Prints a pre-formatted message in a coloured Rich panel."""
     console.print(Panel(
         formatted_message,
         border_style=panel_color,

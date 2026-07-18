@@ -67,7 +67,7 @@ class TestLinewrap:
 class TestFixedWidthAlwaysReturnsTheRequestedWidth:
     def test_every_combination_of_length_and_alignment(self) -> None:
         for text in ("", "a", "ab", "abcdef", "abcdefghijklmnop"):
-            for width in range(0, 8):
+            for width in range(8):
                 for align in (ALIGN_LEFT, ALIGN_RIGHT, ALIGN_CENTER):
                     result = str_with_fixed_width(text, width, align)
                     assert len(result) == width, (

@@ -1,4 +1,8 @@
-from importlib.metadata import version as pkg_version, PackageNotFoundError
+"""Reads the installed package version, falling back to pyproject.toml."""
+
+import tomllib
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as pkg_version
 from pathlib import Path
 from typing import cast
 
@@ -42,8 +46,7 @@ def get_version(
     try:
         return pkg_version(package_name)
     except PackageNotFoundError:
-        import tomllib
         toml_path = pyproject_toml or Path("pyproject.toml")
-        with open(toml_path, "rb") as f:
+        with Path(toml_path).open("rb") as f:
             data = tomllib.load(f)
-        return cast(str, data["project"]["version"])
+        return cast("str", data["project"]["version"])

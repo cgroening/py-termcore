@@ -1,11 +1,15 @@
+"""Sets up file and console logging for an application."""
+
 import logging
 from pathlib import Path
 
 
 def setup_logging(appname: str, level: int = logging.DEBUG) -> None:
     """
-    Sets up logging for the application. Logs are stored in the user's
-    home directory under `.local/state/{appname}/app.log`.
+    Sets up logging for the application.
+
+    Logs are stored in the user's home directory, under
+    `.local/state/{appname}/app.log`.
 
     Parameters
     ----------

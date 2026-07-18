@@ -1,7 +1,4 @@
 """
-termz.io.database
-=================
-
 Lightweight database management module for handling SQLite databases with ease.
 
 This module provides an abstraction layer for SQLite databases, simplifying
@@ -22,6 +19,11 @@ Ideal for applications requiring a simple, efficient database interaction layer.
 
 How statements are built
 ------------------------
+The `# noqa: S608` markers below say the same thing in machine terms: the
+rule sees an f-string in a statement and cannot see that every value is a
+parameter and every identifier came through `_quoted_table` or
+`_quoted_column`, which reject anything the schema does not know.
+
 Values never reach the statement text. They are bound as parameters, so no
 value can be read as SQL, whatever it contains.
 
@@ -32,24 +34,27 @@ column of the table being addressed, raises `UnknownIdentifierError` instead
 of becoming a fragment of the query.
 """
 from __future__ import annotations
+
 import logging
 import sqlite3
-from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from types import TracebackType
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from termz.io.errors import EmptyConditionsError, UnknownIdentifierError
 
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
+    from types import TracebackType
+
 __all__ = [
+    "VALUELESS_OPERATORS",
     "ColumnOrder",
     "Condition",
     "Database",
     "SQLCombinationOperator",
     "SQLComparisonOperator",
     "SQLOrderByDirection",
-    "VALUELESS_OPERATORS",
 ]
 
 _logger = logging.getLogger(__name__)
@@ -62,6 +67,7 @@ class SQLComparisonOperator(Enum):
     `IS_NULL` and `IS_NOT_NULL` are complete on their own; the `value` of a
     `Condition` using them is ignored.
     """
+
     LT = "<"
     LE = "<="
     EQ = "="
@@ -81,17 +87,15 @@ VALUELESS_OPERATORS = (
 
 
 class SQLCombinationOperator(Enum):
-    """
-    Enumeration defining combination operators (AND, OR) for SQL conditions.
-    """
+    """Combination operators (AND, OR) joining two SQL conditions."""
+
     AND = "AND"
     OR = "OR"
 
 
 class SQLOrderByDirection(Enum):
-    """
-    Enumeration defining sorting order (ASC or DESC) for SQL queries.
-    """
+    """Enumeration defining sorting order (ASC or DESC) for SQL queries."""
+
     ASC = "ASC"
     DESC = "DESC"
 
@@ -108,6 +112,7 @@ class ColumnOrder:
     direction : SQLOrderByDirection
         Direction of sorting (ASC or DESC).
     """
+
     column_name: str
     direction: SQLOrderByDirection
 
@@ -140,6 +145,7 @@ class Condition:
 
         WHERE "model" = ? AND "size" >= ?
     """
+
     column_name: str
     operator: SQLComparisonOperator
     value: str | int | float | bytes | None = None
@@ -163,6 +169,7 @@ class Database:
     cursor : sqlite3.Cursor
         Instance of the database cursor.
     """
+
     connection: sqlite3.Connection
     cursor: sqlite3.Cursor
     debug_mode: bool
@@ -241,9 +248,7 @@ class Database:
             self.close()
 
     def close(self) -> None:
-        """
-        Closes the database connection.
-        """
+        """Closes the database connection."""
         if self.connection:
             self.connection.close()
 
@@ -275,7 +280,7 @@ class Database:
 
         return self._execute(sql, params)
 
-    def fetch(
+    def fetch(  # noqa: PLR0913 - the clauses of a SELECT are the point
             self,
             table: str,
             columns: list[str] | None = None,
@@ -316,7 +321,7 @@ class Database:
             If `columns` is an empty list, or a limit or offset is negative.
         """
         quoted_table = self._quoted_table(table)
-        sql = f"SELECT {self._select_list(table, columns)} FROM {quoted_table}"
+        sql = f"SELECT {self._select_list(table, columns)} FROM {quoted_table}"  # noqa: S608
         params: list[object] = []
 
         # WHERE
@@ -425,7 +430,7 @@ class Database:
         )
         where_sql, where_params = self._build_where(table, conditions)
 
-        sql = f"UPDATE {quoted_table} SET {assignments} WHERE {where_sql}"
+        sql = f"UPDATE {quoted_table} SET {assignments} WHERE {where_sql}"  # noqa: S608
         params = [values[column] for column in columns] + where_params
 
         cursor = self._execute(sql, params)
@@ -463,7 +468,7 @@ class Database:
         quoted_table = self._quoted_table(table)
         where_sql, where_params = self._build_where(table, conditions)
 
-        sql = f"DELETE FROM {quoted_table} WHERE {where_sql}"
+        sql = f"DELETE FROM {quoted_table} WHERE {where_sql}"  # noqa: S608
 
         cursor = self._execute(sql, where_params)
         self.connection.commit()
@@ -471,9 +476,7 @@ class Database:
         return cursor.rowcount
 
     def save(self) -> None:
-        """
-        Commits the current transaction.
-        """
+        """Commits the current transaction."""
         self.connection.commit()
 
     def _insert_row(
@@ -489,21 +492,23 @@ class Database:
         )
         placeholders = ", ".join("?" for _ in columns)
 
-        sql = (f"INSERT INTO {quoted_table} ({column_list}) "
+        sql = (f"INSERT INTO {quoted_table} ({column_list}) "  # noqa: S608
                f"VALUES ({placeholders})")
         cursor = self._execute(sql, [row[column] for column in columns])
 
         # Read the row back by rowid: every ordinary table has one, whatever
         # its own columns happen to be called
         stored: sqlite3.Row | None = self._execute(
-            f"SELECT * FROM {quoted_table} WHERE rowid = ?",
+            f"SELECT * FROM {quoted_table} WHERE rowid = ?",  # noqa: S608
             [cursor.lastrowid]
         ).fetchone()
 
         # A table without a rowid cannot be read back this way; handing
         # the caller what was written beats handing them nothing
         if stored is None:
-            return cast(dict[str, str | int | float | bytes | None], dict(row))
+            return cast(
+                "dict[str, str | int | float | bytes | None]", dict(row)
+            )
 
         return dict(stored)
 
@@ -604,7 +609,7 @@ class Database:
                 "WHERE type IN ('table', 'view')"
             ).fetchall()
             self._table_cache = frozenset(
-                cast(str, row["name"]) for row in rows
+                cast("str", row["name"]) for row in rows
             )
 
         return self._table_cache
@@ -617,7 +622,7 @@ class Database:
                 f"PRAGMA table_info({quoted_table})"
             ).fetchall()
             self._column_cache[table] = frozenset(
-                cast(str, row["name"]) for row in rows
+                cast("str", row["name"]) for row in rows
             )
 
         return self._column_cache[table]

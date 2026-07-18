@@ -1,16 +1,18 @@
+"""A Textual SelectionList that shows check marks instead of X marks."""
+
 from typing import TypeVar
 
+from rich.segment import Segment
+from textual.strip import Strip
 from textual.widgets import SelectionList
 from textual.widgets._toggle_button import ToggleButton
-from textual.strip import Strip
-from rich.segment import Segment
 
 _SelectionType = TypeVar("_SelectionType")
 
 
 class CustomSelectionList(SelectionList[_SelectionType]):
     """
-    A custom Textual SelectionList whose items display a check mark when selected.
+    A Textual SelectionList whose items show a check mark when selected.
 
     If unselected, they show an empty box - instead of the default
     behavior of showing an "X".
@@ -20,15 +22,13 @@ class CustomSelectionList(SelectionList[_SelectionType]):
     CUSTOM_BUTTON_INNER : str
         The character to display when an item is selected.
     """
+
     CUSTOM_BUTTON_INNER = "✔"
 
 
-    def __init__(self, *args, **kwargs) -> None:  # pyright:ignore[reportUnknownParameterType, reportMissingParameterType]
-        super().__init__(*args, **kwargs)  # pyright:ignore[reportUnknownArgumentType]
-
     def render_line(self, y: int) -> Strip:
         """
-        Overwrite `textual.widgets.selection_list.SelectionList.render_line()` to customize the look of checked and unchecked items.
+        Renders one line, with check marks instead of X marks.
 
         Parameters
         ----------

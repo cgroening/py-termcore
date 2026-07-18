@@ -37,6 +37,102 @@ dev = [
 Homepage = "https://github.com/cgroening/py-termz"
 Repository = "https://github.com/cgroening/py-termz"
 
+[tool.ruff]
+line-length = 80
+target-version = "py312"
+extend-exclude = [".venv", "venv"]
+
+# The formatter is deliberately not configured. Running it would rewrite 41 of
+# the 55 files here for no behavioural gain, and the style guide gives these
+# documented rules precedence over an automatic formatter anyway (1.2.1).
+# The column limit is enforced by E501 below; line breaking stays hand-made.
+
+[tool.ruff.lint]
+select = [
+    "F",     # pyflakes
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "I",     # isort
+    "N",     # pep8-naming
+    "D",     # pydocstyle
+    "UP",    # pyupgrade
+    "ANN",   # flake8-annotations
+    "S",     # flake8-bandit (security)
+    "B",     # flake8-bugbear
+    "A",     # flake8-builtins (no shadowing of builtins)
+    "BLE",   # flake8-blind-except
+    "C4",    # flake8-comprehensions
+    "C90",   # mccabe complexity
+    "DTZ",   # flake8-datetimez (no naive datetimes)
+    "ERA",   # eradicate (no commented-out code)
+    "FBT",   # flake8-boolean-trap (no flag arguments)
+    "G",     # flake8-logging-format
+    "INP",   # flake8-no-pep420 (every package needs __init__.py)
+    "LOG",   # flake8-logging
+    "PIE",   # flake8-pie
+    "Q",     # flake8-quotes (double quotes, even when that means escaping)
+    "RSE",   # flake8-raise
+    "SIM",   # flake8-simplify
+    "SLF",   # flake8-self (no private member access across objects)
+    "T20",   # flake8-print (visible output goes through termz.cli.output)
+    "TC",    # flake8-type-checking
+    "TRY",   # tryceratops
+    "PTH",   # flake8-use-pathlib
+    "PT",    # flake8-pytest-style
+    "RET",   # flake8-return
+    "ARG",   # flake8-unused-arguments
+    "TID",   # flake8-tidy-imports
+    "PL",    # pylint
+    "RUF",   # ruff-specific rules
+]
+ignore = [
+    "D107",    # __init__ is documented in the class docstring
+    "D203",    # conflicts with D211 (no blank line before class docstring)
+    "D213",    # conflicts with D212 (summary on the first line)
+    "D401",    # summaries use 3rd person ("Prints..."), not the imperative
+    # TRY003 bans descriptive messages at the raise site, which works against
+    # the rule that exceptions must carry context (what, where, why).
+    "TRY003",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.flake8-quotes]
+inline-quotes = "double"
+docstring-quotes = "double"
+# Section 3.2.5 requires a string holding a double quote to keep it escaped
+# rather than switch delimiters. Without this, Q003 reports every one of them.
+avoid-escape = false
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "parents"
+
+[tool.ruff.lint.pylint]
+max-args = 3  # style guide: keep parameter count at 3 or below
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403"]  # re-export the public package API
+# Theme folders are loaded by path through ThemeLoader, never imported, and
+# their directory names are not valid identifiers.
+"termz/tui/themes/*/theme.py" = ["INP001", "D100"]
+# termz.cli.output is the module that owns visible console output; a print
+# here is the product, not a stray debug statement.
+"termz/cli/output.py" = ["T201"]
+# Textual reads annotations at runtime, so a type-only import moved into
+# a TYPE_CHECKING block stops resolving (style guide 3.2.9).
+"termz/tui/**" = ["TC002", "TC003"]
+"tests/**" = [
+    "S101",    # assert is the point of a test
+    "D",       # no docstrings required in tests
+    "ANN",     # no annotations required in tests
+    "PLR2004", # magic values are fine as expected test values
+    "SLF001",  # tests legitimately reach into private members
+    "PLR0913", # a fixture factory takes what the cases need to vary
+    "PT011",   # pytest.raises(Exception) is deliberate where the library
+               # deliberately lets the driver's own error through
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
@@ -64,6 +160,12 @@ show_missing = true
 fail_under = 70
 
 [tool.pyright]
+# Section 3.2.5 of the style guide asks for strict. Worth knowing what that
+# means with basedpyright, whose own default is "recommended": recommended is
+# the stricter of the two, so this line does not tighten the checking here -
+# it states the contract, and it is what a consumer running plain pyright
+# needs, since pyright's default "standard" really is lax.
+typeCheckingMode = "strict"
 exclude = [
     "**/.*",
     "**/__pycache__",
@@ -72,9 +174,21 @@ exclude = [
     "venv",
     "**/node_modules",
 ]
-reportUnannotatedClassAttribute = "none"
+# The four below are inert under strict, which does not enable them. They are
+# kept because they describe real properties of this codebase, so switching to
+# "recommended" stays a one-line change: without them that mode reports 146
+# warnings here, 105 of them reportUnusedCallResult alone.
+#
+# Textual's API returns values from methods called for their side effect
+# (mount, register_theme, add_row); consuming each one adds noise.
 reportUnusedCallResult = "none"
-reportCallInDefaultInitializer = "none"
+# Textual widgets declare class attributes (BINDINGS, CSS_PATH, reactives)
+# whose types come from the base class.
+reportUnannotatedClassAttribute = "none"
+# Overriding a Textual hook without @override is the framework's own style.
 reportImplicitOverride = "none"
-reportMissingTypeStubs = "none"
+# Adjacent string literals are how long messages are wrapped within 80 columns.
 reportImplicitStringConcatenation = "none"
+#
+# Removed after measuring: reportCallInDefaultInitializer and
+# reportMissingTypeStubs reported nothing in either mode.

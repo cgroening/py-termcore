@@ -1,8 +1,10 @@
 """Domain exceptions raised by the `termz.io` modules."""
 
 __all__ = [
+    "AppStateError",
     "DatabaseError",
     "EmptyConditionsError",
+    "StateFileError",
     "UnknownIdentifierError",
 ]
 
@@ -20,6 +22,7 @@ class UnknownIdentifierError(DatabaseError):
     unknown name here means a typo is reported as a typo, and a name that
     was never a column cannot become a fragment of SQL.
     """
+
     name: str
     known: tuple[str, ...]
 
@@ -41,6 +44,7 @@ class EmptyConditionsError(DatabaseError):
     something that turned out to be empty, and carrying on would rewrite or
     delete every row in the table.
     """
+
     operation: str
 
     def __init__(self, operation: str) -> None:
@@ -50,3 +54,18 @@ class EmptyConditionsError(DatabaseError):
             f"were given. Use query() if that is genuinely intended."
         )
         self.operation = operation
+
+
+class AppStateError(Exception):
+    """Base class for every error raised while handling the app state."""
+
+
+class StateFileError(AppStateError):
+    """
+    Raised when the state file cannot be read, created or written.
+
+    The storage used to print a message and call `sys.exit()` here, which
+    takes the whole application down from inside a library and leaves the
+    caller no way to react. Losing the state is worth reporting, but it is
+    the application's decision what to do about it.
+    """

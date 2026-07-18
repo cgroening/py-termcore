@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 import pytest
 
 from termz.util.datetime import (
+    DateFormat,
     date_diff,
     date_to_timestamp,
     timestamp_to_date,
@@ -38,9 +39,9 @@ class TestTimestampToDate:
         timestamp = int(datetime(2026, 7, 18, 12, tzinfo=UTC).timestamp())
         assert timestamp_to_date(timestamp) == "18.07.2026"
 
-    def test_english_format_on_request(self) -> None:
+    def test_iso_format_on_request(self) -> None:
         timestamp = int(datetime(2026, 7, 18, 12, tzinfo=UTC).timestamp())
-        assert timestamp_to_date(timestamp, english_format=True) \
+        assert timestamp_to_date(timestamp, DateFormat.ISO) \
             == "2026-07-18"
 
     def test_none_yields_an_empty_string(self) -> None:
@@ -63,8 +64,8 @@ class TestDateToTimestamp:
         moment = datetime.fromtimestamp(timestamp, tz=UTC).astimezone()
         assert (moment.hour, moment.minute, moment.second) == (0, 0, 0)
 
-    def test_english_format_on_request(self) -> None:
-        assert date_to_timestamp("2026-07-18", english_format=True) \
+    def test_iso_format_on_request(self) -> None:
+        assert date_to_timestamp("2026-07-18", DateFormat.ISO) \
             == date_to_timestamp("18.07.2026")
 
     def test_a_malformed_date_yields_none(self) -> None:
@@ -111,9 +112,9 @@ class TestToday:
         expected = datetime.now(UTC).astimezone().strftime("%d.%m.%Y")
         assert today_date() == expected
 
-    def test_today_date_in_english_format(self) -> None:
+    def test_today_date_in_iso_format(self) -> None:
         expected = datetime.now(UTC).astimezone().strftime("%Y-%m-%d")
-        assert today_date(english_format=True) == expected
+        assert today_date(DateFormat.ISO) == expected
 
     def test_today_timestamp_and_today_date_agree(self) -> None:
         assert timestamp_to_date(today_timestamp()) == today_date()

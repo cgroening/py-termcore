@@ -1,7 +1,4 @@
 """
-termz.util.string
-=================
-
 Provides utility functions for string manipulation and formatting.
 
 This module contains helper methods for performing common string operations.
@@ -26,7 +23,7 @@ ELLIPSIS = "…"
 
 
 def linewrap(text: str, linewidth: int) -> str:
-    """
+    r"""
     Splits a string into multiple lines with a specified maximum width.
 
     Words are kept intact where possible. A word longer than `linewidth` has

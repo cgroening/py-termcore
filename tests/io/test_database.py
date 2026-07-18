@@ -6,6 +6,7 @@ module and are pinned hardest below: a value can never be read as SQL, and an
 identifier that is not in the schema never reaches the statement at all.
 """
 
+import sqlite3
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
@@ -48,10 +49,13 @@ class TestConnectionLifecycle:
         with Database(path) as db:
             db.query("CREATE TABLE t (a TEXT)")
 
-        with pytest.raises(RuntimeError):
+        def write_then_fail() -> None:
             with Database(path) as db:
                 db.query("INSERT INTO t (a) VALUES (?)", ["discarded"])
                 raise RuntimeError("something went wrong")
+
+        with pytest.raises(RuntimeError):
+            write_then_fail()
 
         with Database(path) as reopened:
             assert reopened.fetch("t") == []
@@ -62,7 +66,7 @@ class TestConnectionLifecycle:
 
     def test_saving_after_close_is_refused(self, db: Database) -> None:
         db.close()
-        with pytest.raises(Exception):
+        with pytest.raises(sqlite3.ProgrammingError):
             db.save()
 
     def test_data_survives_reopening_the_file(self, tmp_path: Path) -> None:
@@ -306,7 +310,7 @@ class TestInsert:
     ) -> None:
         # Each row used to be committed on its own, so a failure half way
         # through left the earlier rows behind.
-        with pytest.raises(Exception):
+        with pytest.raises(sqlite3.IntegrityError):
             db.insert("tasks", [
                 {"id": 1, "title": "first"},
                 {"id": 1, "title": "duplicate id"},

@@ -1,6 +1,5 @@
 from textual.theme import Theme
 
-
 TEXTUAL_THEME = Theme(
     name="xplore-blue-muted",
     primary="#9BC3FF",

@@ -1,3 +1,5 @@
+"""General utilities: dates, strings, indices and logging."""
+
 from .datetime import *
 from .debug import *
 from .index import *

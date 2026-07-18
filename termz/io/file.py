@@ -1,10 +1,6 @@
 
 """
-termz.io.file
-=============
-
-This module provides functionality for reading, writing and managing text
-files efficiently.
+Reading, writing and managing files and folders.
 
 It offers a simple and lightweight interface for handling
 text-based file operations.
@@ -26,9 +22,9 @@ This module is particularly useful for applications requiring efficient and
 straightforward text file operations, such as logging systems, data processing
 and configuration management.
 """
-from dataclasses import dataclass
-import os
 import shutil
+from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(slots=True)
@@ -55,6 +51,7 @@ class FolderItem:
     TODO: Method to copy/move/delete a file (one method "copy" that copies
           folders and files)
     """
+
     type: str
     name: str
     level: int
@@ -72,13 +69,10 @@ class File:
 
     @staticmethod
     def folder_content(
-        path: str, extfilter: str | None = None,
-        withsubfolders: bool = False,
-        level: int = 0
+        path: str, extfilter: str | None = None
     ) -> dict[str, FolderItem]:
         """
-        Retrieves the contents of a given folder, optionally including
-        subfolders.
+        Retrieves the contents of a given folder, without its subfolders.
 
         Parameters
         ----------
@@ -87,24 +81,54 @@ class File:
         extfilter : str or None, optional
             A specific file extension to filter results
             (e.g., "txt").
-        withsubfolders : bool, optional
-            Whether to include subfolders recursively.
-        level : int, optional
-            Depth level in the directory tree
-            (used for recursion).
 
         Returns
         -------
         dict[str, FolderItem]
             A dictionary where the keys are item paths and the values are
             FolderItem instances containing metadata about each item.
+        """
+        return File._folder_content(path, extfilter, with_subfolders=False)
+
+    @staticmethod
+    def folder_content_recursive(
+        path: str, extfilter: str | None = None
+    ) -> dict[str, FolderItem]:
+        """
+        Retrieves the contents of a given folder and of every subfolder.
+
+        Each `FolderItem` carries its depth below `path` in `level`.
+
+        Parameters
+        ----------
+        path : str
+            The directory path to list contents from.
+        extfilter : str or None, optional
+            A specific file extension to filter results
+            (e.g., "txt").
+
+        Returns
+        -------
+        dict[str, FolderItem]
+            A dictionary where the keys are item paths and the values are
+            FolderItem instances containing metadata about each item.
+        """
+        return File._folder_content(path, extfilter, with_subfolders=True)
+
+    @staticmethod
+    def _folder_content(  # noqa: PLR0913 - level is carried by recursion
+        path: str, extfilter: str | None = None, level: int = 0,
+        *, with_subfolders: bool
+    ) -> dict[str, FolderItem]:
+        """
+        Lists a folder, descending into subfolders when asked to.
 
         Notes
         -----
         TODO: also return a sorted list of the keys of the dictionary
         """
         # Get all items of the folder and create a dictionary
-        items_list: list[str] = os.listdir(path)
+        items_list: list[str] = [p.name for p in Path(path).iterdir()]
         items_dict: dict[str, FolderItem] = {}
 
         # Loop folder items
@@ -112,9 +136,10 @@ class File:
             item_path = path + "/" + item
 
             # Recursion if the item is a folder
-            if os.path.isdir(item_path) and withsubfolders:
-                items_dict = {**items_dict, **File.folder_content(
-                     item_path + "/", extfilter, withsubfolders, level=level+1)}
+            if Path(item_path).is_dir() and with_subfolders:
+                items_dict = {**items_dict, **File._folder_content(
+                    item_path + "/", extfilter, level + 1,
+                    with_subfolders=with_subfolders)}
                 item_type = "folder"
             else:
                 item_type = "file"
@@ -152,14 +177,12 @@ class File:
         TODO: Add functionality for moving or deleting folders.
         """
         # Create target folder if it doesn't exist
-        if not os.path.exists(target):
-            os.makedirs(target)
+        Path(target).mkdir(parents=True, exist_ok=True)
 
         # Copy each file
         # TODO: Also copy sub folder (-> recursion)
-        file_list = os.listdir(source)
-        for file_name in file_list:
-            shutil.copyfile(source + "/" + file_name, target + "/" + file_name)
+        for entry in Path(source).iterdir():
+            shutil.copyfile(entry, Path(target) / entry.name)
 
     @staticmethod
     def extension(file_name: str) -> str | None:
@@ -184,8 +207,7 @@ class File:
         # Das letzte Element der Liste (= Dateiendung) zurückgeben
         if count > 1:
             return file_name.split(".")[count - 1]
-        else:
-            return None
+        return None
 
     @staticmethod
     def change_extension(file_name: str, extension: str) -> str:
@@ -212,7 +234,6 @@ class File:
         # with the new extension
         if count > 1:
             file_name_split[count-1] = extension
-            print(file_name_split)
             file_name = ".".join(file_name_split)
 
         return file_name
@@ -234,6 +255,4 @@ class File:
         """
         file_path_list: list[str] = file_path.split("/")
         file_path_list.remove(file_path_list[len(file_path_list) - 1])
-        file_path = "/".join(file_path_list)
-
-        return file_path
+        return "/".join(file_path_list)

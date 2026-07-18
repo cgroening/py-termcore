@@ -1,10 +1,5 @@
 """
-termz.tui.question_screen
-=========================
-
-This module defines `QuestionScreen`, a subclass of `ModalScreen`
-in the Textual framework, designed to present a question to the user and
-collect a simple boolean response.
+A modal screen that asks a yes/no question and returns the answer.
 
 The screen displays a customizable question and two buttons labeled "Yes"
 and "No". It uses Textual's event system to handle user interactions and
@@ -17,18 +12,19 @@ ideal for confirmation dialogs, safety prompts or binary decision points within
 an application UI.
 """
 from enum import Enum
+from typing import ClassVar
 
+from textual import on
 from textual.app import ComposeResult
+from textual.binding import BindingType
 from textual.containers import Grid
 from textual.screen import ModalScreen
 from textual.widgets import Button, Label
-from textual import on
 
 
 class ButtonColor(Enum):
-    """
-    Enum for button colors.
-    """
+    """Enum for button colors."""
+
     DEFAULT = "default"
     PRIMARY = "primary"
     ERROR = "error"
@@ -37,12 +33,11 @@ class ButtonColor(Enum):
 
 
 class QuestionScreen(ModalScreen[bool]):
-    """
-    A screen that asks a question and returns the answer as a boolean value.
-    """
+    """A screen that asks a question and returns a boolean answer."""
+
     yes_button_color: ButtonColor
     no_button_color: ButtonColor
-    BINDINGS = [
+    BINDINGS: ClassVar[list[BindingType]] = [
         ("escape", "close_modal", "Close"),
     ]
     CSS = """
@@ -77,18 +72,14 @@ class QuestionScreen(ModalScreen[bool]):
     def __init__(self, question: str,
                  yes_button_color: ButtonColor = ButtonColor.ERROR,
                  no_button_color: ButtonColor = ButtonColor.PRIMARY) -> None:
-        """
-        Initialize the QuestionScreen with a question.
-        """
+        """Initialize the QuestionScreen with a question."""
         self.question = question
         self.yes_button_color = yes_button_color
         self.no_button_color = no_button_color
         super().__init__()
 
     def compose(self) -> ComposeResult:
-        """
-        Compose the screen layout.
-        """
+        """Compose the screen layout."""
         yield Grid(
             Label(self.question, id="question"),
             Button("Yes", variant=self.yes_button_color.value, id="yes"),
@@ -97,21 +88,15 @@ class QuestionScreen(ModalScreen[bool]):
         )
 
     def action_close_modal(self) -> None:
-        """
-        Closes the modal popup.
-        """
-        self.dismiss(False)
+        """Closes the modal popup."""
+        self.dismiss(result=False)
 
     @on(Button.Pressed, "#yes")
     def handle_yes(self) -> None:
-        """
-        Handle the "Yes" button press.
-        """
-        self.dismiss(True)
+        """Handle the "Yes" button press."""
+        self.dismiss(result=True)
 
     @on(Button.Pressed, "#no")
     def handle_no(self) -> None:
-        """
-        Handle the "No" button press.
-        """
-        self.dismiss(False)
+        """Handle the "No" button press."""
+        self.dismiss(result=False)

@@ -1,6 +1,5 @@
 from textual.theme import Theme
 
-
 # https://userpage.fu-berlin.de/mirjamk/htmlkurs/16farben.html
 TEXTUAL_THEME = Theme(
     name="pure-sweet16",

@@ -1,7 +1,4 @@
 """
-termz.tui.custom_data_table
-===========================
-
 Extension of Textual's DataTable with support for flexible column resizing.
 
 This module defines `CustomDataTable`, a subclass of Textual's `DataTable`
@@ -22,20 +19,20 @@ layout accordingly.
 This is particularly useful for applications with tabular data in dynamic
 layouts or where users resize windows and expect columns to adapt gracefully.
 """
-from typing import TypeVar
+from typing import Any, TypeVar
 
+from textual.coordinate import Coordinate
 from textual.message import Message
 from textual.widget import Widget
 from textual.widgets import DataTable
-from textual.coordinate import Coordinate
-from textual.widgets._data_table import ColumnKey, Column
+from textual.widgets._data_table import Column, ColumnKey
 
 _CellType = TypeVar("_CellType")
 
 
 class CustomDataTable(DataTable[_CellType]):
     """
-    CustomDataTable is a subclass of DataTable that provides additional functionality for handling flexible column widths and resizing.
+    A DataTable with columns that stretch to fill the available width.
 
     Attributes
     ----------
@@ -45,18 +42,33 @@ class CustomDataTable(DataTable[_CellType]):
         List of column keys that should be flexible in width
         (will be adjusted according to window width).
     """
+
     MIN_FLEX_COL_WIDTH = 5
-    flexible_columns: list[ColumnKey] = []
+    flexible_columns: list[ColumnKey]
 
 
     class Mounted(Message):
-        def __init__(self, sender: Widget):
+        """Posted once the table has been mounted and can be filled."""
+
+        def __init__(self, sender: Widget) -> None:
+            """Records which widget was mounted."""
             super().__init__()
             self.sender = sender
 
 
-    def __init__(self, **kwargs):  # pyright:ignore[reportUnknownParameterType, reportMissingParameterType]
-        super().__init__(**kwargs)  # pyright:ignore[reportUnknownArgumentType]
+    def __init__(self, **kwargs: Any) -> None:  # noqa: ANN401
+        """
+        Initializes the table with an empty set of flexible columns.
+
+        The arguments are whatever `DataTable` takes, which is what Any
+        says here; naming them would mean restating fifteen parameters
+        and re-stating them again on every Textual release.
+        """
+        super().__init__(**kwargs)
+
+        # Per instance: as a class attribute every table in the process
+        # shared one list and inherited the columns of all the others.
+        self.flexible_columns = []
 
 
     def on_mount(self) -> None:
@@ -88,7 +100,6 @@ class CustomDataTable(DataTable[_CellType]):
         table_width = self.size.width - len(self.columns) * 2 - scrollbar_width
         fixed_widths = self.get_fixed_column_widths()
         self.adjust_flexible_columns(table_width, fixed_widths)
-        # self.update_scrollbar_visibility()
         self.refresh()
 
     def get_fixed_column_widths(self) -> int:
@@ -115,7 +126,7 @@ class CustomDataTable(DataTable[_CellType]):
     def adjust_flexible_columns(self, table_width: int, fixed_width: int) \
     -> None:
         """
-        Adjusts the widths of the flexible columns based on the available width in the table.
+        Adjusts the flexible columns to the width the table has.
 
         Parameters
         ----------
@@ -134,14 +145,16 @@ class CustomDataTable(DataTable[_CellType]):
                 )
 
                 # Don't allow column width to be less than MIN_FLEX_COL_WIDTH
-                if column.width < self.MIN_FLEX_COL_WIDTH:
-                    column.width = self.MIN_FLEX_COL_WIDTH
+                column.width = max(column.width, self.MIN_FLEX_COL_WIDTH)
 
         self.update_virtual_size()
 
     def update_virtual_size(self) -> None:
         """
-        Updates the virtual size of the DataTable based on the current column widths to only show the horizontal scrollbar when necessary.
+        Updates the virtual size from the current column widths.
+
+        This is what makes the horizontal scrollbar appear only when it is
+        actually needed.
 
         The effect of this method is that the DataTable has the correct width
         (no hidden column at the right side "compensating" the reduced widths
@@ -202,9 +215,7 @@ class CustomDataTable(DataTable[_CellType]):
         )
 
     def select_first_row(self) -> None:
-        """
-        Selects the first row in the table and posts a RowHighlighted event.
-        """
+        """Selects the first row and posts a RowHighlighted event."""
         if self.row_count == 0:
             return
 
@@ -219,27 +230,14 @@ class CustomDataTable(DataTable[_CellType]):
         )
 
     def delete_selected_row(self) -> None:
-        """
-        Deletes the currently selected row from the table.
-        """
+        """Deletes the currently selected row from the table."""
         if self.row_count > 0:
             row_key, _ = self.coordinate_to_cell_key(self.cursor_coordinate)
             self.remove_row(row_key)
 
     # def get_current_id(self) -> int:
-    #     """
     #     Returns the ID of the currently selected topic.
 
     #     Returns:
     #         int: The ID of the currently selected topic.
-    #     """
-    #     selected_row = self.get_row_at(self.cursor_row)
-    #     return int(selected_row[0].plain.strip())
 
-    # def delete_selected_row(self) -> None:
-    #     """
-    #     Deletes the currently selected row from the table.
-    #     """
-    #     if self.cursor_row is not None:
-    #         row_key, _ = self.coordinate_to_cell_key(self.cursor_coordinate)
-    #         self.remove_row(row_key)

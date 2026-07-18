@@ -1,9 +1,5 @@
 """
-termz.util.debug
-================
-
-Provides decorator-based debugging utilities for function call inspection and
-performance measurement.
+Decorators for inspecting calls and measuring execution time.
 
 This module offers decorators that can be used to:
 
@@ -39,19 +35,21 @@ Measuring execution time of a function
 
 """
 
+import logging
 import time
 from collections.abc import Callable
 from functools import wraps
 from typing import ParamSpec, TypeVar
 
+_logger = logging.getLogger(__name__)
+
 P = ParamSpec("P")
 R = TypeVar("R")
 
 
-def print_arguments(fn: Callable[P, R]) -> Callable[P, R]:
+def print_arguments[**P, R](fn: Callable[P, R]) -> Callable[P, R]:
     """
-    A decorator that prints the arguments, keyword arguments, function name
-    and return value each time the decorated function is called.
+    Logs name, arguments and return value on every call.
 
     Parameters
     ----------
@@ -80,52 +78,69 @@ def print_arguments(fn: Callable[P, R]) -> Callable[P, R]:
         R
             The original return value of the decorated function.
         """
-        # Print function name + args and kwargs
-        print(f"Function {fn.__name__} called")
-        print(f"Args: {args}")
-        print(f"Kwargs: {kwargs}")
+        # Report the call through the logger, so a consumer can filter
+        # or silence it like any other diagnostic
+        _logger.debug("Function %s called", fn.__name__)
+        _logger.debug("Args: %r", args)
+        _logger.debug("Kwargs: %r", kwargs)
 
         # Call function
         fn_result = fn(*args, **kwargs)
 
-        # Print return value of the function
-        print(f"Function {fn.__name__} returns: {fn_result}")
+        _logger.debug(
+            "Function %s returns: %r", fn.__name__, fn_result
+        )
 
         return fn_result
 
     return wrapper
 
 
-def timing(use_ns_timer: bool = False) -> Callable[[Callable[P, R]], Callable[P, R]]:
+def timing() -> Callable[[Callable[P, R]], Callable[P, R]]:
     """
-    A decorator factory that measures the execution time of the decorated
-    function.
-
-    The time unit can be set to either seconds or nanoseconds.
-
-    Parameters
-    ----------
-    use_ns_timer : bool, optional
-        If True nanosecond precision timing is used.
+    A decorator factory that measures the execution time in seconds.
 
     Returns
     -------
     Callable
         A decorator that wraps the target function with timing logic.
     """
-    if use_ns_timer:
-        # Use nanosecond precision timing
-        time_fn = time.perf_counter_ns
-        time_scale = "ns"
-    else:
-        # Use second precision timing
-        time_fn = time.perf_counter  # type: ignore
-        time_scale = "s"
+    return _timing(time.perf_counter, "s")
 
+
+def timing_ns() -> Callable[[Callable[P, R]], Callable[P, R]]:
+    """
+    A decorator factory that measures the execution time in nanoseconds.
+
+    Returns
+    -------
+    Callable
+        A decorator that wraps the target function with timing logic.
+    """
+    return _timing(time.perf_counter_ns, "ns")
+
+
+def _timing(
+    time_fn: Callable[[], float], time_scale: str
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    """
+    Builds the timing decorator around the given clock.
+
+    Parameters
+    ----------
+    time_fn : Callable
+        The clock to read, in the unit `time_scale` names.
+    time_scale : str
+        Unit suffix written to the log.
+
+    Returns
+    -------
+    Callable
+        A decorator that wraps the target function with timing logic.
+    """
     def wrap_with_timing(fn: Callable[P, R]) -> Callable[P, R]:
         """
-        Wrapper function that measures and prints the execution time of the
-        decorated function.
+        Wraps the function so its execution time is measured.
 
         Parameters
         ----------
@@ -163,7 +178,10 @@ def timing(use_ns_timer: bool = False) -> Callable[[Callable[P, R]], Callable[P,
             # Store end time + calculate and print execution time
             end_time = time_fn()
             duration = end_time - start_time
-            print(f"Function {fn.__name__} took: {duration} {time_scale}")
+            _logger.debug(
+                "Function %s took: %s %s",
+                fn.__name__, duration, time_scale
+            )
 
             return fn_result
 

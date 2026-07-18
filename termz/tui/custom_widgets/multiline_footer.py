@@ -1,5 +1,5 @@
 """
-MultiLineFooter - a multi-line footer for Textual, extending the built-in Footer.
+MultiLineFooter - a multi-line footer extending Textual's built-in Footer.
 
 Two modes:
 
@@ -25,8 +25,10 @@ The `row_map` maps binding actions to row numbers (0-based).
 Unassigned bindings fall into the last defined row.
 """
 from __future__ import annotations
+
 from collections import defaultdict
 from typing import cast, override
+
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import HorizontalGroup
@@ -68,6 +70,7 @@ class MultiLineFooter(Footer):
     compact : bool, default False
         Use compact styling with less whitespace.
     """
+
     DEFAULT_CSS: str = """
     MultiLineFooter {
         height: auto;
@@ -76,11 +79,11 @@ class MultiLineFooter(Footer):
     }
     """
 
-    auto_wrap: reactive[bool] = reactive(True)
+    auto_wrap: reactive[bool] = reactive(default=True)
     max_rows: reactive[int] = reactive(0)
     _bindings_ready: bool
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - mirrors Textual's Widget signature
         self,
         *,
         auto_wrap: bool = True,
@@ -89,7 +92,7 @@ class MultiLineFooter(Footer):
         show_command_palette: bool = True,
         compact: bool = False,
         name: str | None = None,
-        id: str | None = None,
+        id: str | None = None,  # noqa: A002 - Textual's parameter name
         classes: str | None = None,
     ) -> None:
         super().__init__(
@@ -114,7 +117,7 @@ class MultiLineFooter(Footer):
     def _collect_bindings(self) -> list[tuple[Binding, bool, str]]:
         """Collects active visible bindings, excluding the command palette."""
         active = self.screen.active_bindings
-        app = cast(App[object], self.app)
+        app = cast("App[object]", self.app)
         palette_key = (
             app.COMMAND_PALETTE_BINDING
             if self.show_command_palette and app.ENABLE_COMMAND_PALETTE
@@ -128,7 +131,7 @@ class MultiLineFooter(Footer):
 
     def _get_palette_binding(self) -> tuple[Binding, bool, str] | None:
         """Returns the command palette binding tuple or None."""
-        app = cast(App[object], self.app)
+        app = cast("App[object]", self.app)
         if not (self.show_command_palette and app.ENABLE_COMMAND_PALETTE):
             return None
         try:
@@ -147,7 +150,7 @@ class MultiLineFooter(Footer):
         rows: list[list[tuple[Binding, bool, str]]] = [[]]
         current_width = 0
 
-        app = cast(App[object], self.app)
+        app = cast("App[object]", self.app)
         for binding, enabled, tooltip in bindings:
             key_display = app.get_key_display(binding)
             w = self._estimate_key_width(key_display, binding.description) + 1
@@ -184,7 +187,7 @@ class MultiLineFooter(Footer):
         if not self._bindings_ready:
             return
 
-        app = cast(App[object], self.app)
+        app = cast("App[object]", self.app)
         bindings = self._collect_bindings()
         rows = (
             self._build_rows_auto(bindings)

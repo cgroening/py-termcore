@@ -1,9 +1,5 @@
 """
-termz.tui.custom_bindings
-=========================
-
-Module for managing custom key bindings in Textual applications using
-YAML configuration.
+Key bindings for Textual applications, declared in YAML.
 
 This module defines the class `CustomBindings` for managing custom keyboard
 bindings in a Textual application. It loads key binding definitions from
@@ -27,10 +23,10 @@ Each binding supports the following fields:
   tooltip               Longer description shown on hover
   key_display           Override how the key is rendered in the footer
   row                   Footer row index (0-based, default: 0)
-  priority              bool – show binding even when a widget captures input
-  show                  bool – whether to show in the footer (default: true)
+  priority              bool - show binding even when a widget captures input
+  show                  bool - whether to show in the footer (default: true)
   id                    Optional binding ID
-  system                bool – mark as a system binding
+  system                bool - mark as a system binding
 
 Group naming rules
 ------------------
@@ -85,15 +81,28 @@ Example
         row: 0
 """
 import re
+from dataclasses import replace
+from pathlib import Path
+
 import yaml
 from textual.binding import Binding, BindingType
 
 
-class CustomBindings():
+def _sort_key(binding: Binding) -> str:
+    """Turns a key like "F1" or "f1" into "f01", so f2 sorts before f10."""
+    match = re.match(r"(f)(\d+)", binding.key.lower())
+    if match:
+        return f"{match.group(1)}{int(match.group(2)):02d}"
+
+    return binding.key.lower()
+
+
+class CustomBindings:
     """
-    Singleton class to manage custom key bindings loaded from a YAML file for
-    use in a Textual application. See module docstring for details on
-    YAML structure and usage.
+    Manages the key bindings loaded from a YAML file.
+
+    See the module docstring for the YAML structure and the group naming
+    rules.
 
     Attributes
     ----------
@@ -113,6 +122,7 @@ class CustomBindings():
     global_actions : list[str]
         List of actions that are always shown globally.
     """
+
     _yaml_file_path: str
     _sort_alphabetically: bool
     _bindings_dict_raw: dict[str, list[dict[str, str]]]
@@ -122,16 +132,14 @@ class CustomBindings():
     _global_actions: list[str]
 
 
-    def __init__(
-        self,
-        yaml_file: str,
-        sort_alphabetically: bool = False,
-    ) -> None:
+    def __init__(self, yaml_file: str) -> None:
         """
-        Reads the YAML file and processes the bindings into a structured format.
+        Reads the YAML file, keeping the order it declares.
+
+        Use `CustomBindings.sorted_by_key` for a set sorted by key instead.
         """
         self._yaml_file_path = yaml_file
-        self._sort_alphabetically = sort_alphabetically
+        self._sort_alphabetically = False
         self._bindings_dict = {}
         self._action_to_groups = {}
         self._action_row_map = {}
@@ -139,20 +147,39 @@ class CustomBindings():
         self._read_yaml_file()
         self._process_bindings()
 
-    def _read_yaml_file(self):
+    @classmethod
+    def sorted_by_key(cls, yaml_file: str) -> "CustomBindings":
         """
-        Loads the binding definitions from the YAML file into a dictionary.
+        Returns the bindings of the file, sorted by key within each group.
+
+        Function keys sort numerically, so f2 comes before f10.
+
+        Parameters
+        ----------
+        yaml_file : str
+            Path to the YAML file containing the key bindings.
+
+        Returns
+        -------
+        CustomBindings
+            The loaded bindings, ordered by key rather than by file order.
         """
-        with open(self._yaml_file_path, "r", encoding="utf-8") as file:
+        bindings = cls(yaml_file)
+        bindings._sort_alphabetically = True
+
+        return bindings
+
+    def _read_yaml_file(self) -> None:
+        """Loads the binding definitions from the YAML file."""
+        with Path(self._yaml_file_path).open(encoding="utf-8") as file:
             self._bindings_dict_raw = yaml.safe_load(file)
 
-    def _process_bindings(self):
+    def _process_bindings(self) -> None:
         """
-        Processes the raw data from the YAML file into a structured format
-        suitable for use in the Textual application. It converts each binding
-        into a `Binding` instance and organizes them by their group name.
-        Also builds the `action_to_groups` mapping and stores the name of
-        global actions in `global_actions`.
+        Turns the raw YAML data into `Binding` instances.
+
+        Groups them by their group name, builds the `action_to_groups`
+        mapping and records the global actions in `global_actions`.
         """
         # Loop groups
         for group, bindings in self._bindings_dict_raw.items():
@@ -163,14 +190,16 @@ class CustomBindings():
             for binding in bindings:
                 key         = self._parse_key(binding.get("key"))
                 action      = self._parse_action(binding.get("action"), group)
-                description = self._parse_description(binding.get("description"))
+                description = self._parse_description(
+                                  binding.get("description")
+                              )
                 show        = self._parse_show(binding.get("show"))
                 key_display = self._parse_key_display(
                                   key, binding.get("key_display")
                               )
                 priority    = self._parse_priority(binding.get("priority"))
                 tooltip     = self._parse_tooltip(binding.get("tooltip"))
-                id          = self._parse_id(binding.get("id"))
+                binding_id  = self._parse_id(binding.get("id"))
                 system      = self._parse_system(binding.get("system"))
 
                 # Skip if any required field is missing
@@ -185,7 +214,7 @@ class CustomBindings():
                     key_display=key_display,
                     priority   =priority,
                     tooltip    =tooltip,
-                    id         =id,
+                    id         =binding_id,
                     system     =system
                 )
                 self._bindings_dict[group].append(binding_instance)
@@ -203,117 +232,150 @@ class CustomBindings():
                 if group.startswith("_global"):
                     self._global_actions.append(action)
 
-        # logging.debug(f'Bindings: {pprint.pformat(self.bindings_dict)}')
 
-    def get_row_map(
-        self, for_screen: bool = False, screen_name: str | None = None
-    ) -> dict[str, int]:
+    def get_row_map(self) -> dict[str, int]:
         """
-        Returns a row map for use with `MultiLineFooter(auto_wrap=False)`,
-        using the `row` values defined in the YAML file.
+        Returns a row map for use with `MultiLineFooter(auto_wrap=False)`.
 
-        When `for_screen=True` or `screen_name` is given, global action
-        keys are prefixed with `app.` to match the binding actions produced
-        by `get_bindings(for_screen=True)`.
+        Uses the `row` values defined in the YAML file. Pair this with
+        `get_bindings`; a Screen wants `get_screen_row_map` instead.
 
         Returns
         -------
         dict[str, int]
             A mapping of action names to row numbers (0-based).
         """
-        use_app_prefix = for_screen or bool(screen_name)
-        row_map: dict[str, int] = {}
-        for action, row in self._action_row_map.items():
-            key = f"app.{action}" if use_app_prefix and action in self._global_actions else action
-            row_map[key] = row
-        return row_map
+        return dict(self._action_row_map)
 
-    def get_bindings(
-        self, tab_name: str | None = None, screen_name: str | None = None,
-        for_screen: bool = False
-    ) -> list[BindingType]:
+    def get_screen_row_map(self) -> dict[str, int]:
         """
-        Returns a list (sorted by key if `self.sort_alphabetically` is `True`)
-        of all bindings across all groups.
+        Returns the row map as a Screen needs it.
 
-        If `tab_name` or `screen_name` is provided, only bindings for that
-        specific tab/screen are returned. Otherwise, bindings from all groups
-        - except tab/ screen-specific ones (beginning with '_screen_') -
-        are included.
+        Global actions are keyed with the `app.` prefix, matching the actions
+        `get_screen_bindings` produces. If the two disagree, the footer
+        silently loses the row of every global binding.
+
+        Returns
+        -------
+        dict[str, int]
+            A mapping of action names to row numbers (0-based).
+        """
+        return {
+            self._dispatch_name(action): row
+            for action, row in self._action_row_map.items()
+        }
+
+    def get_bindings(self, tab_name: str | None = None) -> list[BindingType]:
+        """
+        Returns the bindings for the App itself.
+
+        Includes every tab group, or just one when `tab_name` is given, plus
+        the global bindings. Screen groups are left out; a Screen uses
+        `get_screen_bindings`.
 
         Parameters
         ----------
         tab_name : str or None, optional
-            Optional name of the tab for which to get bindings.
-        screen_name : str or None, optional
-            Optional name of the screen for which to get bindings.
+            Restricts the result to the bindings of that one tab.
 
         Returns
         -------
         list[BindingType]
-            A list of `Binding` instances sorted by their key.
+            The bindings, globals last.
         """
-        def get_sort_key(binding: Binding):
-            """Transforms a key like "F1" or "f1" to "f01" for sorting."""
-            match = re.match(r"(f)(\d+)", binding.key.lower())
-            if match:
-                return f"{match.group(1)}{int(match.group(2)):02d}"
-            return binding.key.lower()
+        self._sort_groups_by_key()
+        bindings: list[BindingType] = self._tab_bindings(tab_name)
+        bindings.extend(self._global_bindings())
 
-        # Sort each group of bindings by their key
-        if self._sort_alphabetically:
-            for group, bindings in self._bindings_dict.items():
-                self._bindings_dict[group] = sorted(bindings, key=get_sort_key)
+        return bindings
 
-        # Collect global bindings (non-destructive)
-        global_groups = [g for g in self._bindings_dict if g.startswith("_global")]
-        global_bindings: list[BindingType] = []
-        for g in global_groups:
-            global_bindings.extend(self._bindings_dict.get(g, []))
+    def get_screen_bindings(
+        self, screen_name: str | None = None
+    ) -> list[BindingType]:
+        """
+        Returns the bindings for a Screen, with globals dispatched on the App.
 
-        # Combine all bindings into a single list - excluding global and screen ones
-        bindings_list: list[BindingType] = []
+        Without a name the tab bindings are included, which is what a screen
+        holding a `TabbedContent` needs. With one, only that screen's own
+        group is.
+
+        Parameters
+        ----------
+        screen_name : str or None, optional
+            Name of the screen, without the `_screen` suffix its group
+            carries in the YAML file.
+
+        Returns
+        -------
+        list[BindingType]
+            The bindings, globals last and prefixed with `app.`.
+        """
+        self._sort_groups_by_key()
+
+        bindings: list[BindingType] = (
+            self._tab_bindings(None) if screen_name is None
+            else self._screen_bindings(screen_name)
+        )
+        bindings.extend(self._app_dispatched_globals())
+
+        return bindings
+
+    def _sort_groups_by_key(self) -> None:
+        """Sorts every group by key, if this instance was built that way."""
+        if not self._sort_alphabetically:
+            return
+
         for group, bindings in self._bindings_dict.items():
-            # Always skip global and screen groups in the main loop
+            self._bindings_dict[group] = sorted(bindings, key=_sort_key)
+
+    def _tab_bindings(self, tab_name: str | None) -> list[BindingType]:
+        """Returns the bindings of every tab group, or of one named tab."""
+        bindings: list[BindingType] = []
+        for group, group_bindings in self._bindings_dict.items():
+            # Global and screen groups are appended by the callers instead
             if group.startswith("_global") or group.endswith("_screen"):
                 continue
-            # If a tab name is given, only include bindings for that tab
-            if tab_name:
-                if group != tab_name.lower():
-                    continue
-            # If a screen name is given, skip all tab bindings
-            elif screen_name:
+            if tab_name and group != tab_name.lower():
                 continue
 
-            bindings_list.extend(bindings)
+            bindings.extend(group_bindings)
 
-        # Append screen-specific bindings when screen_name is given
-        if screen_name:
-            screen_group = f"{screen_name.lower()}_screen"
-            bindings_list.extend(self._bindings_dict.get(screen_group, []))
+        return bindings
 
-        # Append global bindings, prefixed with 'app.' for screen context
-        if screen_name or for_screen:
-            global_bindings = [
-                Binding(
-                    key=b.key,
-                    action=f"app.{b.action}",
-                    description=b.description,
-                    show=b.show,
-                    key_display=b.key_display,
-                    priority=b.priority,
-                    tooltip=b.tooltip,
-                    id=b.id,
-                    system=b.system,
-                )
-                for b in global_bindings if isinstance(b, Binding)
-            ]
-        bindings_list.extend(global_bindings)
+    def _screen_bindings(self, screen_name: str) -> list[BindingType]:
+        """Returns the bindings of one screen group."""
+        group = f"{screen_name.lower()}_screen"
 
-        # logging.debug(f'All bindings: {pprint.pformat(self.bindings_dict)}')
-        # logging.debug(f'Return value: {pprint.pformat(bindings_list)}')
+        return list(self._bindings_dict.get(group, []))
 
-        return bindings_list
+    def _global_bindings(self) -> list[BindingType]:
+        """Returns the always-visible bindings, as they were declared."""
+        bindings: list[BindingType] = []
+        for group, group_bindings in self._bindings_dict.items():
+            if group.startswith("_global"):
+                bindings.extend(group_bindings)
+
+        return bindings
+
+    def _app_dispatched_globals(self) -> list[BindingType]:
+        """
+        Returns the global bindings with their action prefixed by `app.`.
+
+        A Screen would otherwise look for `action_quit` on itself, find
+        nothing, and the key would quietly do nothing.
+        """
+        return [
+            replace(binding, action=f"app.{binding.action}")
+            for binding in self._global_bindings()
+            if isinstance(binding, Binding)
+        ]
+
+    def _dispatch_name(self, action: str) -> str:
+        """Returns the name a Screen dispatches the given action under."""
+        if action in self._global_actions:
+            return f"app.{action}"
+
+        return action
 
     def handle_check_action(
         self, action: str,
@@ -321,8 +383,7 @@ class CustomBindings():
         active_group: str
     ) -> bool | None:
         """
-        Checks if a given action should be displayed based on the current
-        active group.
+        Checks whether an action should be shown in the active group.
 
         This is meant to be used in the check_action method of a Textual app.
 
@@ -349,23 +410,14 @@ class CustomBindings():
             return True
 
         # Check if the action belongs to the current tab/group
-        # logging.debug(
-        #     f'Checking action "{action}" for active group "{active_group}"'
-        # )
-        if active_group in self._action_to_groups[action]:
-            return True
-
-        return False
+        return active_group in self._action_to_groups[action]
 
     def _is_global_key(self, action: str) -> bool:
         """Checks if the given action belongs to a global key binding."""
         return action in self._global_actions
 
     def _is_custom_action(self, action: str) -> bool:
-        """
-        Returns true if the given action is a custom action defined in
-        the bindings.
-        """
+        """Returns True if the action is one the bindings declare."""
         return action in self._action_to_groups
 
     def _parse_key(self, key: str | None) -> str | None:
@@ -373,10 +425,7 @@ class CustomBindings():
         return key
 
     def _parse_action(self, action: str | None, group: str) -> str | None:
-        """
-        Parses the action field from the YAML binding definition, applying
-        group-specific prefixing rules.
-        """
+        """Parses the action field, applying the group prefixing rules."""
         if action is None:
             return None
         if group.startswith("_global") or group.endswith("_screen"):
@@ -388,21 +437,18 @@ class CustomBindings():
         return description
 
     def _parse_show(self, show: str | None) -> bool:
-        """
-        Parses the show field from the YAML binding definition, defaulting
-        to True.
-        """
+        """Parses the show field, defaulting to True."""
         if show is None:
             return True
-        else:
-            return bool(show)
+        return bool(show)
 
     def _parse_key_display(
         self, key: str | None, key_display: str | None
     ) -> str | None:
         """
-        Parses the key_display field from the YAML binding definition. For
-        function keys (e.g. "f1") it formats them as "F1"; otherwise the
+        Parses the key_display field of a binding.
+
+        A function key such as "f1" is rendered as "F1"; otherwise the
         declared value is kept, and None leaves the rendering to Textual.
         """
         if key is None:
@@ -415,39 +461,27 @@ class CustomBindings():
         return key_display
 
     def _parse_priority(self, priority: str | None) -> bool:
-        """
-        Parses the priority field from the YAML binding definition, defaulting
-        to False.
-        """
+        """Parses the priority field, defaulting to False."""
         if priority is None:
             return False
-        else:
-            return bool(priority)
+        return bool(priority)
 
     def _parse_tooltip(self, tooltip: str | None) -> str:
-        """
-        Parses the tooltip field from the YAML binding definition, defaulting to
-        an empty string.
-        """
+        """Parses the tooltip field, defaulting to an empty string."""
         if tooltip is None:
             return ""
-        else:
-            return tooltip
+        return tooltip
 
-    def _parse_id(self, id: str | None) -> str | None:
+    def _parse_id(self, binding_id: str | None) -> str | None:
         """Parses the id field from the YAML binding definition."""
-        if id is None:
-            return None
-        else:
-            return id
+        return binding_id
 
     def _parse_system(self, system: str | None) -> bool:
         """
-        Parses the system field from the YAML binding definition, defaulting to
-        False. System bindings are marked as such to prevent them from being
-        overridden by widgets that capture input.
+        Parses the system field, defaulting to False.
+
+        A system binding is not overridden by a widget that captures input.
         """
         if system is None:
             return False
-        else:
-            return bool(system)
+        return bool(system)
