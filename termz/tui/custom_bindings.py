@@ -46,7 +46,7 @@ Group naming rules
     → `tasks_tab_add`. Use `check_action` with the active tab name as
     `active_group` to control visibility.
 
-`_screen_<name>`
+`<name>_screen`
     Screen-specific bindings. The action is used as-is (no prefix), so it maps
     directly to an `action_<name>` method on the Screen.
 
@@ -114,12 +114,12 @@ class CustomBindings():
         List of actions that are always shown globally.
     """
     _yaml_file_path: str
-    _sort_alphabetically: bool = False
+    _sort_alphabetically: bool
     _bindings_dict_raw: dict[str, list[dict[str, str]]]
-    _bindings_dict: dict[str, list[Binding]] = {}
-    _action_to_groups: dict[str, list[str]] = {}
-    _action_row_map: dict[str, int] = {}
-    _global_actions: list[str] = []
+    _bindings_dict: dict[str, list[Binding]]
+    _action_to_groups: dict[str, list[str]]
+    _action_row_map: dict[str, int]
+    _global_actions: list[str]
 
 
     def __init__(
@@ -132,6 +132,10 @@ class CustomBindings():
         """
         self._yaml_file_path = yaml_file
         self._sort_alphabetically = sort_alphabetically
+        self._bindings_dict = {}
+        self._action_to_groups = {}
+        self._action_row_map = {}
+        self._global_actions = []
         self._read_yaml_file()
         self._process_bindings()
 
@@ -162,7 +166,7 @@ class CustomBindings():
                 description = self._parse_description(binding.get("description"))
                 show        = self._parse_show(binding.get("show"))
                 key_display = self._parse_key_display(
-                                  key, binding.get("key_display"), group
+                                  key, binding.get("key_display")
                               )
                 priority    = self._parse_priority(binding.get("priority"))
                 tooltip     = self._parse_tooltip(binding.get("tooltip"))
@@ -337,7 +341,7 @@ class CustomBindings():
             True if the action should be displayed, False otherwise.
         """
         # Ignore actions that are not defined in custom bindings
-        if not self._is_custom_action(action, active_group):
+        if not self._is_custom_action(action):
             return True
 
         # Global actions are always shown
@@ -357,16 +361,12 @@ class CustomBindings():
         """Checks if the given action belongs to a global key binding."""
         return action in self._global_actions
 
-    def _is_custom_action(self, action: str, _group: str) -> bool:
+    def _is_custom_action(self, action: str) -> bool:
         """
         Returns true if the given action is a custom action defined in
         the bindings.
         """
         return action in self._action_to_groups
-
-    def _action_belongs_to_group(self, action: str, group: str) -> bool:
-        """Returns true if the given action belongs to the specified group."""
-        return group in self._action_to_groups.get(action, [])
 
     def _parse_key(self, key: str | None) -> str | None:
         """Parses the key field from the YAML binding definition."""
@@ -398,14 +398,12 @@ class CustomBindings():
             return bool(show)
 
     def _parse_key_display(
-        self, key: str | None,
-        key_display: str | None,
-        group: str
+        self, key: str | None, key_display: str | None
     ) -> str | None:
         """
-        Parses the key_display field from the YAML binding definition. If not
-        provided, it defaults to the key value. For function keys (e.g. "f1"),
-        it formats them as "F1".
+        Parses the key_display field from the YAML binding definition. For
+        function keys (e.g. "f1") it formats them as "F1"; otherwise the
+        declared value is kept, and None leaves the rendering to Textual.
         """
         if key is None:
             return None
@@ -413,9 +411,6 @@ class CustomBindings():
         match = re.fullmatch(r"(f)(\d+)", key.lower())
         if match:
             key_display = f"F{int(match.group(2))}"
-
-        # if group.startswith('_global'):
-        #     key_display = f'*{key_display or key}'
 
         return key_display
 
