@@ -19,26 +19,65 @@ Features:
 - Ensures proper connection closure on object deletion
 
 Ideal for applications requiring a simple, efficient database interaction layer.
+
+How statements are built
+------------------------
+Values never reach the statement text. They are bound as parameters, so no
+value can be read as SQL, whatever it contains.
+
+Identifiers cannot be parameters - SQL has no placeholder for a table or a
+column - so they are checked against the schema of the open database before
+they are used, and quoted afterwards. A name that is not a table, or not a
+column of the table being addressed, raises `UnknownIdentifierError` instead
+of becoming a fragment of the query.
 """
 from __future__ import annotations
-from dataclasses import dataclass
+import logging
 import sqlite3
-import copy
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from enum import Enum
 from types import TracebackType
 from typing import cast
-from termz.util.string import linewrap
+
+from termz.io.errors import EmptyConditionsError, UnknownIdentifierError
+
+__all__ = [
+    "ColumnOrder",
+    "Condition",
+    "Database",
+    "SQLCombinationOperator",
+    "SQLComparisonOperator",
+    "SQLOrderByDirection",
+    "VALUELESS_OPERATORS",
+]
+
+_logger = logging.getLogger(__name__)
 
 
 class SQLComparisonOperator(Enum):
     """
-    Enumeration defining comparison operators (<, <=, =, >=, >) for SQL queries.
+    Enumeration defining comparison operators for SQL queries.
+
+    `IS_NULL` and `IS_NOT_NULL` are complete on their own; the `value` of a
+    `Condition` using them is ignored.
     """
     LT = "<"
     LE = "<="
     EQ = "="
+    NE = "!="
     GE = ">="
     GT = ">"
+    LIKE = "LIKE"
+    IS_NULL = "IS NULL"
+    IS_NOT_NULL = "IS NOT NULL"
+
+
+# The operators that carry no value and therefore bind no parameter
+VALUELESS_OPERATORS = (
+    SQLComparisonOperator.IS_NULL,
+    SQLComparisonOperator.IS_NOT_NULL,
+)
 
 
 class SQLCombinationOperator(Enum):
@@ -84,23 +123,26 @@ class Condition:
         Name of the column for the condition.
     operator : SQLComparisonOperator
         Comparison operator to use.
-    value : str or int or float
-        Value to compare against.
+    value : str or int or float or bytes or None, optional
+        Value to compare against. Ignored by `IS_NULL` and `IS_NOT_NULL`.
     combination : SQLCombinationOperator, optional
-        Logical operator to combine with the next condition (default is AND).
+        Logical operator joining this condition to the previous one (default
+        is AND). The first condition of a list has nothing to join to, so its
+        combination is ignored.
 
     Examples
     --------
-    >>> c1 = Condition(column='model', operator='=', value='standard')
-    >>> c2 = Condition(column='size', operator='>=', value=4, combination='AND')
+    >>> model = Condition("model", SQLComparisonOperator.EQ, "standard")
+    >>> size = Condition("size", SQLComparisonOperator.GE, 4)
 
-    These conditions translated by the Database class to this WHERE statement::
+    These conditions are translated by the Database class into this WHERE
+    statement, with both values bound as parameters::
 
-        WHERE model='standard' AND size>=4
+        WHERE "model" = ? AND "size" >= ?
     """
     column_name: str
     operator: SQLComparisonOperator
-    value: str | int | float
+    value: str | int | float | bytes | None = None
     combination: SQLCombinationOperator = SQLCombinationOperator.AND
 
 
@@ -108,12 +150,14 @@ class Database:
     """
     Class for managing an SQLite database.
 
-    It provides structured API for retrieving, inserting, updating and deleting data.
+    It provides a structured API for retrieving, inserting, updating and
+    deleting data.
 
     Attributes
     ----------
     debug_mode : bool
-        If this is True, the SQL statements will be printed.
+        If this is True, every statement is written to the module logger at
+        debug level before it runs.
     connection : sqlite3.Connection
         Instance of the database connection.
     cursor : sqlite3.Cursor
@@ -121,7 +165,9 @@ class Database:
     """
     connection: sqlite3.Connection
     cursor: sqlite3.Cursor
-    debug_mode: bool = False
+    debug_mode: bool
+    _table_cache: frozenset[str] | None
+    _column_cache: dict[str, frozenset[str]]
 
 
     def __init__(self, database: str) -> None:
@@ -133,6 +179,10 @@ class Database:
         database : str
             Path of the SQLite database file.
         """
+        self.debug_mode = False
+        self._table_cache = None
+        self._column_cache = {}
+
         # Establish database connection
         self.connection = sqlite3.connect(database=database)
 
@@ -146,8 +196,6 @@ class Database:
     def __enter__(self) -> Database:
         """
         Enables the use of the `with` statement for the database connection.
-
-        Ensures that the connection is properly closed when exiting the block.
 
         Returns
         -------
@@ -163,8 +211,11 @@ class Database:
         traceback: TracebackType | None
     ) -> None:
         """
-        Ensures that the database connection is closed when exiting
-        a `with` block.
+        Commits and closes the connection when leaving a `with` block.
+
+        On the way out of an exception the transaction is rolled back
+        instead, so a block that failed half way through leaves nothing
+        behind.
 
         Parameters
         ----------
@@ -175,13 +226,19 @@ class Database:
         traceback : traceback or None
             Traceback object if an exception was raised.
         """
+        if exc_type is None:
+            self.connection.commit()
+        else:
+            self.connection.rollback()
+
         self.close()
 
     def __del__(self) -> None:
-        """
-        Destructor method to ensure the database connection is closed when the object is deleted.
-        """
-        self.close()
+        """Closes the connection when the object is garbage collected."""
+        # __init__ may have failed before the connection was assigned, and an
+        # AttributeError raised in here would surface as an unraisable
+        if hasattr(self, "connection"):
+            self.close()
 
     def close(self) -> None:
         """
@@ -190,27 +247,33 @@ class Database:
         if self.connection:
             self.connection.close()
 
-    def query(self, sql: str) -> sqlite3.Cursor:
+    def query(
+        self, sql: str, params: Sequence[object] = ()
+    ) -> sqlite3.Cursor:
         """
         Runs an SQL command.
 
-        Use this method for commands that are not wrapped by this class.
+        Use this method for commands that are not wrapped by this class. It
+        is the one place where the statement text comes from the caller, so
+        pass values through `params` rather than formatting them into `sql`.
 
         Parameters
         ----------
         sql : str
-            The SQL command.
+            The SQL command, with a `?` for every value.
+        params : Sequence[object], optional
+            Values bound to the placeholders in `sql`.
 
         Returns
         -------
         sqlite3.Cursor
             The cursor.
         """
-        if self.debug_mode:
-            print(linewrap(sql, 60))
-        cursor = self.cursor.execute(sql)
+        # The statement may have altered the schema, and the schema is what
+        # the identifier check is validated against
+        self._invalidate_schema_cache()
 
-        return cursor
+        return self._execute(sql, params)
 
     def fetch(
             self,
@@ -229,12 +292,12 @@ class Database:
         table : str
             Name of the table.
         columns : list[str] or None, optional
-            Optional list of columns to be fetched; if Null is given
+            Optional list of columns to be fetched; if None is given
             all columns will be fetched.
         conditions : list[Condition] or None, optional
             Optional list of conditions.
         orderby : list[ColumnOrder] or None, optional
-            Optional dictionary defining column order.
+            Optional list defining column order.
         limit : int or None, optional
             Optional limit for the query.
         offset : int or None, optional
@@ -244,67 +307,50 @@ class Database:
         -------
         list[dict[str, Any]]
             List of dictionaries in the form [{column_name: value}]
+
+        Raises
+        ------
+        UnknownIdentifierError
+            If the table or one of the columns is not part of the schema.
+        ValueError
+            If `columns` is an empty list, or a limit or offset is negative.
         """
-        # Generate columns string for SELECT
-        if columns is None:
-            cols_str = "*"
-        else:
-            cols_str = ", ".join(columns)
+        quoted_table = self._quoted_table(table)
+        sql = f"SELECT {self._select_list(table, columns)} FROM {quoted_table}"
+        params: list[object] = []
 
-        # Generate string of conditions for WHERE
-        if conditions is not None and len(conditions) > 0:
-            conds_str = " WHERE " + self._generate_conditions_str(conditions)
-        else:
-            conds_str = ""
+        # WHERE
+        if conditions:
+            where_sql, where_params = self._build_where(table, conditions)
+            sql += f" WHERE {where_sql}"
+            params.extend(where_params)
 
-        # Generate string for ORDER BY
-        if orderby is not None and len(orderby) > 0:
-            orderby_str = "ORDER BY "
-            for column in orderby:
-                orderby_str += f"{column.column_name} {column.direction.value}"
+        # ORDER BY
+        if orderby:
+            sql += f" ORDER BY {self._order_list(table, orderby)}"
 
-                # Add comma if it's not the last dictionary element
-                if column is not orderby[-1]:
-                    orderby_str += ", "
-        else:
-            orderby_str = ""
+        # LIMIT / OFFSET
+        limit_sql, limit_params = self._build_limit(limit, offset)
+        sql += limit_sql
+        params.extend(limit_params)
 
-        # Generate string for LIMIT
-        if limit is not None and limit > 0:
-            limit_str = f"LIMIT {limit}"
-        else:
-            limit_str = ""
+        rows: list[sqlite3.Row] = self._execute(sql, params).fetchall()
 
-        # Generate string for OFFSET
-        if offset is not None and offset > 0:
-            offset_str = f"OFFSET {offset}"
-        else:
-            offset_str = ""
+        return [dict(row) for row in rows]
 
-        # SQL query
-        sql = f"SELECT {cols_str} FROM {table}"  # SELECT ... FROM ...
-        sql += conds_str                         # WHERE
-        sql += " " + orderby_str                 # ORDER BY ...
-        sql += " " + limit_str                   # LIMIT ...
-        sql += " " + offset_str                  # OFFSET ...
-        self.query(sql)
-
-        # Return a list of dictionaries (one for each row)
-        rows: list[sqlite3.Row] = self.cursor.fetchall()
-        result = [dict(row) for row in rows]
-
-        return result
-
-    def insert(self, table: str, data: list[dict[str, object]]) \
+    def insert(self, table: str, data: Sequence[Mapping[str, object]]) \
     -> list[dict[str, str | int | float | bytes | None]]:
         """
         Inserts rows into the table.
+
+        All rows are written in one transaction: if any of them fails, none
+        of them is kept.
 
         Parameters
         ----------
         table : str
             Name of the table.
-        data : list[dict[str, object]]
+        data : Sequence[Mapping[str, object]]
             List of dictionaries, e.g.:
             data = [{'col1': 'val1', 'col2': 'val2'}, ...]
 
@@ -313,103 +359,81 @@ class Database:
         list[dict[str, str | int | float | bytes | None]]
             List of dictionaries containing the inserted rows, e.g.:
             [{'id': 1, 'col1': 'val1', 'col2': 'val2'}, ...]
+
+        Raises
+        ------
+        UnknownIdentifierError
+            If the table or one of the columns is not part of the schema.
+        ValueError
+            If one of the rows has no columns.
         """
+        quoted_table = self._quoted_table(table)
         inserted: list[dict[str, str | int | float | bytes | None]] = []
 
-        # Loop rows in data
-        for row in data:
-            # Generate columns string
-            cols = ", ".join(list(row.keys()))
+        try:
+            for row in data:
+                inserted.append(self._insert_row(table, quoted_table, row))
+        except Exception:
+            self.connection.rollback()
+            raise
 
-            # Generate values string, check if type == str
-            vals = ""
-            for col, val in row.items():
-                vals += self.tostr(val)
-
-                # Add comma if it's not the last dictionary element
-                if col is not list(row.keys())[-1]:
-                    vals += ", "
-
-            # SQL query
-            sql = f"INSERT INTO {table} ({cols}) VALUES ({vals})"
-            self.query(sql)
-
-            # Get last inserted row
-            last_id = self.cursor.lastrowid
-            self.connection.commit()
-            result = self.fetch(
-                table,
-                conditions=[
-                    Condition("id", SQLComparisonOperator.EQ, last_id or 0)
-                ]
-            )
-            if result:
-                inserted.append(result[0])
+        self.connection.commit()
 
         return inserted
 
-    def update(self, table: str, data: list[dict[str, object]]) -> None:
+    def update(
+        self, table: str,
+        values: Mapping[str, object],
+        conditions: list[Condition]
+    ) -> int:
         """
-        Updates rows.
-
-        The parameter data is a list of dictionaries (one
-        dictionary for each row) containing the new data and the conditions for
-        the WHERE statement. It has the following structure::
-
-            data = [
-                       {
-                           'col1': 'val1',
-                           'col2': 'val2',
-                           '@conds': [Condition(...), Condition(...), ...]
-                       },
-                       ...
-                   ]
-
-        The dictionary key that begins with an @ points at the list of
-        conditions.
+        Updates every row matching the given conditions.
 
         Parameters
         ----------
         table : str
             Name of the table.
-        data : list[dict[str, object]]
-            List of dictionaries.
+        values : Mapping[str, object]
+            New values, in the form {column_name: value}.
+        conditions : list[Condition]
+            Conditions selecting the rows to update.
+
+        Returns
+        -------
+        int
+            Number of rows that were changed.
+
+        Raises
+        ------
+        EmptyConditionsError
+            If `conditions` is empty. Rewriting every row is not something
+            this method does by accident.
+        UnknownIdentifierError
+            If the table or one of the columns is not part of the schema.
+        ValueError
+            If `values` is empty.
         """
-        # Loop rows in data
-        for i in range(0, len(data)):
-            conditions: list[Condition] = []
-            cols_str = ""
+        if not conditions:
+            raise EmptyConditionsError("update")
+        if not values:
+            raise ValueError("values must not be empty")
 
-            # Create a deep copy of the dict for this row, so it can be looped
-            # (the original dictionary changes size in the following loop)
-            row = copy.deepcopy(data[i])
+        quoted_table = self._quoted_table(table)
+        columns = list(values.keys())
+        assignments = ", ".join(
+            f"{self._quoted_column(table, column)} = ?" for column in columns
+        )
+        where_sql, where_params = self._build_where(table, conditions)
 
-            # Loop columns in row
-            for col, val in row.items():
-                if col[0] == "@":
-                    # Get conditions for this row and remove them from data dict
-                    conditions = cast(list[Condition], val)
-                    del data[i][col]
+        sql = f"UPDATE {quoted_table} SET {assignments} WHERE {where_sql}"
+        params = [values[column] for column in columns] + where_params
 
-            # Loop columns in row (again, without entry for conditions)
-            row = data[i]
-            for col, val in row.items():
-                # Add "col = val"
-                cols_str += f"{col}={self.tostr(val)}"
+        cursor = self._execute(sql, params)
+        self.connection.commit()
 
-                # Add comma if it's not the last dictionary element
-                if col is not list(row.keys())[-1]:
-                    cols_str += ", "
+        return cursor.rowcount
 
-            # Generate conditions string
-            cond_str = self._generate_conditions_str(conditions)
-
-            # SQL query
-            sql = f"UPDATE {table} SET {cols_str} WHERE {cond_str}"
-            self.query(sql)
-            self.connection.commit()
-
-    def remove(self, table: str, conditions: list[Condition]) -> None:
+    def remove(self, table: str, conditions: list[Condition]) -> int:
         """
         Removes the rows from the table which match the list of conditions.
 
@@ -419,74 +443,208 @@ class Database:
             Name of the table.
         conditions : list[Condition]
             List of conditions.
-        """
-        # Generate conditions string
-        cond_str = self._generate_conditions_str(conditions)
 
-        # SQL query
-        sql = f"DELETE FROM {table} WHERE {cond_str}"
-        self.query(sql)
+        Returns
+        -------
+        int
+            Number of rows that were deleted.
+
+        Raises
+        ------
+        EmptyConditionsError
+            If `conditions` is empty. Emptying the table is not something
+            this method does by accident.
+        UnknownIdentifierError
+            If the table or one of the columns is not part of the schema.
+        """
+        if not conditions:
+            raise EmptyConditionsError("delete")
+
+        quoted_table = self._quoted_table(table)
+        where_sql, where_params = self._build_where(table, conditions)
+
+        sql = f"DELETE FROM {quoted_table} WHERE {where_sql}"
+
+        cursor = self._execute(sql, where_params)
         self.connection.commit()
 
-    def _generate_conditions_str(self, conditions: list[Condition]) -> str:
-        """
-        Creates a string out of a list of conditions, so it can be used for the WHERE statement.
-
-        Parameters
-        ----------
-        conditions : list[Condition]
-            List of instances of Condition.
-
-        Returns
-        -------
-        str
-            String representation of the conditions for WHERE clause.
-        """
-        cond_str = ""
-
-        # Loop conditions
-        cond: Condition
-        for cond in conditions:
-            # Add "AND"/"OR" if it's not the first condition
-            if cond is not conditions[0]:
-                cond_str += " " + cond.combination.value + " "
-
-            # Add "col = val"/"col > val"/...
-            cond_str += (f"{cond.column_name}{cond.operator.value}"
-                         f"{self.tostr(cond.value)}")
-
-        return cond_str
-
-    @staticmethod
-    def tostr(value: object) -> str:
-        """
-        Creates a string from the given value.
-
-        Value is None           --> return "NULL"
-        Value is str            --> return escaped string
-        Value is something else --> return value
-
-        Parameters
-        ----------
-        value : object
-            Value that is to be converted to a string.
-
-        Returns
-        -------
-        str
-            The converted value.
-        """
-        if value is None:
-            # None -> NULL
-            return "NULL"
-        elif isinstance(value, str):
-            # Add quotes to string
-            return "'" + str(value).replace("'", "''") + "'"
-        else:
-            return str(value)
+        return cursor.rowcount
 
     def save(self) -> None:
         """
         Commits the current transaction.
         """
         self.connection.commit()
+
+    def _insert_row(
+        self, table: str, quoted_table: str, row: Mapping[str, object]
+    ) -> dict[str, str | int | float | bytes | None]:
+        """Inserts one row and returns it as it was stored."""
+        if not row:
+            raise ValueError("cannot insert a row without any columns")
+
+        columns = list(row.keys())
+        column_list = ", ".join(
+            self._quoted_column(table, column) for column in columns
+        )
+        placeholders = ", ".join("?" for _ in columns)
+
+        sql = (f"INSERT INTO {quoted_table} ({column_list}) "
+               f"VALUES ({placeholders})")
+        cursor = self._execute(sql, [row[column] for column in columns])
+
+        # Read the row back by rowid: every ordinary table has one, whatever
+        # its own columns happen to be called
+        stored: sqlite3.Row | None = self._execute(
+            f"SELECT * FROM {quoted_table} WHERE rowid = ?",
+            [cursor.lastrowid]
+        ).fetchone()
+
+        # A table without a rowid cannot be read back this way; handing
+        # the caller what was written beats handing them nothing
+        if stored is None:
+            return cast(dict[str, str | int | float | bytes | None], dict(row))
+
+        return dict(stored)
+
+    def _select_list(self, table: str, columns: list[str] | None) -> str:
+        """Builds the column list of a SELECT, or `*` for all columns."""
+        if columns is None:
+            return "*"
+        if not columns:
+            raise ValueError(
+                "columns must not be empty; pass None to select all columns"
+            )
+
+        return ", ".join(
+            self._quoted_column(table, column) for column in columns
+        )
+
+    def _order_list(self, table: str, orderby: list[ColumnOrder]) -> str:
+        """Builds the column list of an ORDER BY clause."""
+        return ", ".join(
+            f"{self._quoted_column(table, column.column_name)} "
+            f"{column.direction.value}"
+            for column in orderby
+        )
+
+    def _build_where(
+        self, table: str, conditions: list[Condition]
+    ) -> tuple[str, list[object]]:
+        """
+        Builds a WHERE clause plus the values bound to its placeholders.
+
+        The first condition has nothing to join to, so its `combination` is
+        ignored.
+        """
+        fragments: list[str] = []
+        params: list[object] = []
+
+        for position, condition in enumerate(conditions):
+            # Add "AND"/"OR" if it's not the first condition
+            if position > 0:
+                fragments.append(condition.combination.value)
+
+            column = self._quoted_column(table, condition.column_name)
+            if condition.operator in VALUELESS_OPERATORS:
+                fragments.append(f"{column} {condition.operator.value}")
+            else:
+                fragments.append(f"{column} {condition.operator.value} ?")
+                params.append(condition.value)
+
+        return " ".join(fragments), params
+
+    def _build_limit(
+        self, limit: int | None, offset: int | None
+    ) -> tuple[str, list[object]]:
+        """
+        Builds the LIMIT and OFFSET clause.
+
+        SQLite accepts OFFSET only together with LIMIT, so an offset given on
+        its own is paired with -1, which is SQLite's "no limit".
+        """
+        if limit is not None and limit < 0:
+            raise ValueError(f"limit must not be negative, got {limit}")
+        if offset is not None and offset < 0:
+            raise ValueError(f"offset must not be negative, got {offset}")
+
+        if limit is None and offset is None:
+            return "", []
+
+        clause = " LIMIT ?"
+        params: list[object] = [-1 if limit is None else limit]
+
+        if offset is not None:
+            clause += " OFFSET ?"
+            params.append(offset)
+
+        return clause, params
+
+    def _quoted_table(self, table: str) -> str:
+        """Checks a table name against the schema and quotes it."""
+        known = self._table_names()
+        if table not in known:
+            raise UnknownIdentifierError(table, tuple(sorted(known)))
+
+        return _quote_identifier(table)
+
+    def _quoted_column(self, table: str, column: str) -> str:
+        """Checks a column name against the table's schema and quotes it."""
+        known = self._column_names(table)
+        if column not in known:
+            raise UnknownIdentifierError(column, tuple(sorted(known)))
+
+        return _quote_identifier(column)
+
+    def _table_names(self) -> frozenset[str]:
+        """Returns the names of every table and view in the database."""
+        if self._table_cache is None:
+            rows: list[sqlite3.Row] = self._execute(
+                "SELECT name FROM sqlite_master "
+                "WHERE type IN ('table', 'view')"
+            ).fetchall()
+            self._table_cache = frozenset(
+                cast(str, row["name"]) for row in rows
+            )
+
+        return self._table_cache
+
+    def _column_names(self, table: str) -> frozenset[str]:
+        """Returns the column names of the given table."""
+        if table not in self._column_cache:
+            quoted_table = self._quoted_table(table)
+            rows: list[sqlite3.Row] = self._execute(
+                f"PRAGMA table_info({quoted_table})"
+            ).fetchall()
+            self._column_cache[table] = frozenset(
+                cast(str, row["name"]) for row in rows
+            )
+
+        return self._column_cache[table]
+
+    def _invalidate_schema_cache(self) -> None:
+        """Forgets the cached schema, e.g. after a statement that altered it."""
+        self._table_cache = None
+        self._column_cache.clear()
+
+    def _execute(
+        self, sql: str, params: Sequence[object] = ()
+    ) -> sqlite3.Cursor:
+        """Runs one statement with its values bound as parameters."""
+        if self.debug_mode:
+            _logger.debug("SQL: %s -- params: %r", sql, list(params))
+
+        return self.cursor.execute(sql, params)
+
+
+def _quote_identifier(name: str) -> str:
+    """
+    Quotes an identifier so that it can be used in a statement.
+
+    Quoting is what makes a reserved word or a name containing a space usable
+    as a column. It is not the safety mechanism on its own - the callers check
+    the name against the schema first.
+    """
+    escaped = name.replace("\"", "\"\"")
+
+    return "\"" + escaped + "\""
