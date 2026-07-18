@@ -6,6 +6,10 @@ from importlib.metadata import version as pkg_version
 from pathlib import Path
 from typing import cast
 
+__all__ = [
+    "get_version",
+]
+
 
 def get_version(
     package_name: str, pyproject_toml_parent_path: Path | None = None

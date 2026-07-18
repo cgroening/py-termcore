@@ -11,6 +11,15 @@ from typing import cast
 from textual.app import App
 from textual.theme import Theme
 
+__all__ = [
+    "DEFAULT_CUSTOM_THEME_PREFIX",
+    "DEFAULT_TERMZ_THEME_PREFIX",
+    "SCRIPT_DIR",
+    "STANDARD_THEMES_DIR",
+    "ThemeData",
+    "ThemeLoader",
+]
+
 DEFAULT_TERMZ_THEME_PREFIX = "TERMZ_"
 DEFAULT_CUSTOM_THEME_PREFIX = "CUSTOM_"
 SCRIPT_DIR = Path(__file__).parent.parent
@@ -333,9 +342,24 @@ class ThemeLoader:
         theme_name = self.get_previously_used_theme(
             theme_config_file, default_theme_name
         )
-        if theme_name in app.available_themes:
-            app.theme = theme_name
 
+        # A theme removed between two runs is the ordinary case, and a caller
+        # that passes a default expects it to be used rather than ignored
+        if theme_name not in app.available_themes:
+            _logger.warning(
+                "Stored theme %r is not registered, falling back to %r",
+                theme_name, default_theme_name
+            )
+            theme_name = default_theme_name
+
+        if theme_name not in app.available_themes:
+            _logger.error(
+                "Default theme %r is not registered either, leaving the "
+                "theme as it is", theme_name
+            )
+            return
+
+        app.theme = theme_name
         _logger.info("Set previous theme: %r", theme_name)
 
     def save_theme_to_config(
@@ -392,8 +416,22 @@ class ThemeLoader:
                 _logger.exception("Error loading CSS file %r", css_file)
 
     def _apply_stylesheet(self, app: App[None]) -> None:
-        """Re-parses the stylesheet so that changes take effect."""
-        app.stylesheet.reparse()
+        """
+        Re-parses the stylesheet so that changes take effect.
+
+        A theme shipping invalid TCSS would otherwise take the whole
+        application down from inside this library. Keeping the previous
+        stylesheet is a defined state; the failure goes to the log.
+        """
+        try:
+            app.stylesheet.reparse()
+        except Exception:
+            _logger.exception(
+                "Theme stylesheet could not be parsed, keeping the previous "
+                "one"
+            )
+            return
+
         try:
             app.stylesheet.update(app.screen)
         except Exception:

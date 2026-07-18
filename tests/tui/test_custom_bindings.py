@@ -6,8 +6,10 @@ of that fails loudly when it drifts - the shortcut simply stops working - so
 the rules are pinned here rather than left to the consumer to discover.
 """
 
+import logging
 from collections.abc import Sequence
 
+import pytest
 from textual.binding import Binding
 
 from termz.tui.custom_bindings import CustomBindings
@@ -387,3 +389,187 @@ class TestHandleCheckAction:
         bindings = CustomBindings(write_bindings(BINDINGS))
 
         assert bindings.handle_check_action("app.quit", (), "tasks_tab")
+
+
+class TestSilentPathsAreReported:
+    """Each of these used to happen without a word.
+
+    A shortcut that quietly does not exist is the hardest kind of defect to
+    find, because nothing about the running app points at the YAML file.
+    """
+
+    def test_a_dropped_binding_names_the_missing_fields(
+        self, write_bindings: WriteBindings, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.WARNING):
+            CustomBindings(write_bindings("""
+                _global:
+                  - key: q
+                    action: quit
+            """))
+
+        assert "Skipping a binding in group '_global'" in caplog.text
+        assert "description" in caplog.text
+
+    def test_a_duplicate_action_is_reported(
+        self, write_bindings: WriteBindings, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # Only groups that do not prefix can collide, so this is a global and
+        # a screen claiming the same name. The second overwrites the first
+        # one's footer row.
+        with caplog.at_level(logging.WARNING):
+            bindings = CustomBindings(write_bindings("""
+                _global:
+                  - key: escape
+                    action: cancel
+                    description: Cancel
+                    row: 0
+                add_screen:
+                  - key: q
+                    action: cancel
+                    description: Also cancel
+                    row: 1
+            """))
+
+        assert "declared more than once" in caplog.text
+        assert bindings.get_row_map()["cancel"] == 1  # the last writer wins
+
+    def test_an_unknown_tab_name_is_reported(
+        self, write_bindings: WriteBindings, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        bindings = CustomBindings(write_bindings(BINDINGS))
+
+        with caplog.at_level(logging.WARNING):
+            result = bindings.get_bindings(tab_name="no_such_tab")
+
+        assert actions(result) == ["quit"]
+        assert "No binding group" in caplog.text
+
+    def test_an_unknown_screen_name_is_reported(
+        self, write_bindings: WriteBindings, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        bindings = CustomBindings(write_bindings(BINDINGS))
+
+        with caplog.at_level(logging.WARNING):
+            bindings.get_screen_bindings("no_such_screen")
+
+        assert "No binding group" in caplog.text
+
+    def test_a_known_name_is_silent(
+        self, write_bindings: WriteBindings, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        bindings = CustomBindings(write_bindings(BINDINGS))
+
+        with caplog.at_level(logging.WARNING):
+            bindings.get_bindings(tab_name="tasks_tab")
+            bindings.get_screen_bindings("add")
+
+        assert caplog.text == ""
+
+
+class TestBooleanFieldsAreReadStrictly:
+    """`bool("false")` is True, so a quoted boolean meant its opposite."""
+
+    def test_a_quoted_false_is_refused(
+        self, write_bindings: WriteBindings, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.WARNING):
+            bindings = CustomBindings(write_bindings("""
+                _global:
+                  - key: q
+                    action: quit
+                    description: Quit
+                    show: "false"
+            """))
+
+        binding = bindings.get_bindings()[0]
+
+        assert isinstance(binding, Binding)
+        assert binding.show is True  # the documented default, not the string
+        assert "Expected true or false" in caplog.text
+
+    def test_an_unquoted_false_is_honoured(
+        self, write_bindings: WriteBindings, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.WARNING):
+            bindings = CustomBindings(write_bindings("""
+                _global:
+                  - key: q
+                    action: quit
+                    description: Quit
+                    show: false
+            """))
+
+        binding = bindings.get_bindings()[0]
+
+        assert isinstance(binding, Binding)
+        assert binding.show is False
+        assert caplog.text == ""
+
+    def test_a_number_is_refused_for_priority(
+        self, write_bindings: WriteBindings, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.WARNING):
+            bindings = CustomBindings(write_bindings("""
+                _global:
+                  - key: q
+                    action: quit
+                    description: Quit
+                    priority: 1
+            """))
+
+        binding = bindings.get_bindings()[0]
+
+        assert isinstance(binding, Binding)
+        assert binding.priority is False
+        assert "Expected true or false" in caplog.text
+
+
+class TestKeyDisplayPrecedence:
+    def test_a_declared_value_wins_over_the_function_key_rule(
+        self, write_bindings: WriteBindings
+    ) -> None:
+        # The field exists to override how the key is rendered, so overriding
+        # it in turn was backwards.
+        bindings = CustomBindings(write_bindings("""
+            _global:
+              - key: f1
+                action: help
+                description: Help
+                key_display: Hilfe
+        """))
+
+        binding = bindings.get_bindings()[0]
+
+        assert isinstance(binding, Binding)
+        assert binding.key_display == "Hilfe"
+
+    def test_a_function_key_without_one_is_still_formatted(
+        self, write_bindings: WriteBindings
+    ) -> None:
+        bindings = CustomBindings(write_bindings("""
+            _global:
+              - key: f1
+                action: help
+                description: Help
+        """))
+
+        binding = bindings.get_bindings()[0]
+
+        assert isinstance(binding, Binding)
+        assert binding.key_display == "F1"
+
+    def test_an_ordinary_key_is_left_to_textual(
+        self, write_bindings: WriteBindings
+    ) -> None:
+        bindings = CustomBindings(write_bindings("""
+            _global:
+              - key: ctrl+s
+                action: save
+                description: Save
+        """))
+
+        binding = bindings.get_bindings()[0]
+
+        assert isinstance(binding, Binding)
+        assert binding.key_display is None

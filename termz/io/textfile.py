@@ -20,6 +20,10 @@ Features:
 
 from pathlib import Path
 
+__all__ = [
+    "Textfile",
+]
+
 
 class Textfile:
     """

@@ -11,6 +11,13 @@ property of that view, and naming it at the call site says so.
 """
 
 
+
+__all__ = [
+    "clamped_index",
+    "next_index",
+]
+
+
 def next_index(current_index: int, length: int, direction: int = 1) -> int:
     """
     Calculates the next index in a list, wrapping around at both ends.

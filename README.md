@@ -394,18 +394,22 @@ s_today  = today_date()                        # "02.04.2026"
 ### String
 
 ```python
-from termz import linewrap, charpos, str_with_fixed_width
+from termz import linewrap, charpos, cell_width, str_with_fixed_width
 
 wrapped = linewrap("A long piece of text that should be wrapped.", linewidth=20)
 positions = charpos("hello world", "l")  # [2, 3, 9]
 
-# Exactly `width` characters, truncated with an ellipsis or padded
+cell_width("abc")     # 3
+cell_width("日本語")  # 6 - one CJK glyph occupies two terminal cells
+
+# Exactly `width` terminal cells, truncated with an ellipsis or padded
 str_with_fixed_width("a long value", 8)             # "a long …"
 str_with_fixed_width("a long value", 8, "right")    # "…g value"
 str_with_fixed_width("ok", 8, "center")             # "   ok   "
+str_with_fixed_width("日本語テキスト", 8)           # "日本語… "
 ```
 
-The width is counted in characters, not in terminal cells, so text containing full-width characters renders wider than requested.
+Widths are counted in terminal cells rather than in code points, so a column stays aligned whatever the data contains. A double-width glyph cannot be split, so where one would straddle the boundary the result is padded with a space to reach the requested width exactly.
 
 ### Index Navigation
 

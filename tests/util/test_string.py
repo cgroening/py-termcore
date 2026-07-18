@@ -1,9 +1,12 @@
 """Tests for the string formatting helpers.
 
-`str_with_fixed_width` promises "exactly `width` characters", which is the
+`str_with_fixed_width` promises exactly `width` terminal cells, which is the
 whole reason it exists - a fixed-width column that is not fixed-width breaks
 the layout it was meant to hold together. Most of the tests below are that
 one promise, checked at the boundaries where it used to break.
+
+Cells, not characters: one CJK glyph occupies two of them, and counting code
+points is what pushed such a column out of alignment.
 """
 
 import pytest
@@ -12,6 +15,7 @@ from termz.util.string import (
     ALIGN_CENTER,
     ALIGN_LEFT,
     ALIGN_RIGHT,
+    cell_width,
     charpos,
     linewrap,
     str_with_fixed_width,
@@ -64,13 +68,36 @@ class TestLinewrap:
             linewrap("anything", 0)
 
 
+class TestCellWidth:
+    def test_ascii_is_one_cell_each(self) -> None:
+        assert cell_width("abc") == 3
+
+    def test_cjk_is_two_cells_each(self) -> None:
+        assert cell_width("日本語") == 6
+
+    def test_emoji_are_two_cells(self) -> None:
+        assert cell_width("🎉") == 2
+
+    def test_a_combining_mark_adds_nothing(self) -> None:
+        # "e" plus a combining acute renders as one cell, not two.
+        assert cell_width("e\u0301") == 1
+
+    def test_empty_text_is_zero(self) -> None:
+        assert cell_width("") == 0
+
+    def test_mixed_text_adds_up(self) -> None:
+        assert cell_width("ab日") == 4
+
+
 class TestFixedWidthAlwaysReturnsTheRequestedWidth:
     def test_every_combination_of_length_and_alignment(self) -> None:
-        for text in ("", "a", "ab", "abcdef", "abcdefghijklmnop"):
+        texts = ("", "a", "ab", "abcdef", "abcdefghijklmnop",
+                 "日", "日本", "日本語テキスト", "a日b語c", "🎉🎉🎉")
+        for text in texts:
             for width in range(8):
                 for align in (ALIGN_LEFT, ALIGN_RIGHT, ALIGN_CENTER):
                     result = str_with_fixed_width(text, width, align)
-                    assert len(result) == width, (
+                    assert cell_width(result) == width, (
                         f"{text!r}, {width}, {align} -> {result!r}"
                     )
 
@@ -130,3 +157,30 @@ class TestFixedWidthRejectsBadArguments:
     def test_a_negative_width_is_refused(self) -> None:
         with pytest.raises(ValueError):
             str_with_fixed_width("ab", -1)
+
+
+class TestFixedWidthCountsCells:
+    """A column of CJK text has to line up with a column of ASCII."""
+
+    def test_wide_text_is_truncated_by_cells(self) -> None:
+        # Three glyphs are six cells, so only two fit beside the ellipsis.
+        assert str_with_fixed_width("日本語", 5) == "日本…"
+
+    def test_wide_text_is_padded_by_cells(self) -> None:
+        assert str_with_fixed_width("日本", 6) == "日本  "
+
+    def test_a_straddling_glyph_is_not_split(self) -> None:
+        # One cell is left beside the ellipsis and a glyph needs two, so the
+        # result is padded to reach the width exactly.
+        result = str_with_fixed_width("日本", 2)
+
+        assert cell_width(result) == 2
+        assert "日" not in result
+
+    def test_ascii_and_cjk_columns_line_up(self) -> None:
+        column = [
+            str_with_fixed_width(value, 10)
+            for value in ("plain", "日本語", "a日b", "")
+        ]
+
+        assert {cell_width(cell) for cell in column} == {10}

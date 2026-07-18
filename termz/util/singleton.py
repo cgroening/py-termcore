@@ -2,6 +2,10 @@
 
 from typing import Any, cast
 
+__all__ = [
+    "Singleton",
+]
+
 # Keyed by class, so that two classes using this metaclass keep their own
 # instance. Holding the registry here rather than on the metaclass is also
 # what lets __call__ report the constructed class as its return type.

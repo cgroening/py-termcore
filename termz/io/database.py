@@ -43,10 +43,6 @@ from typing import TYPE_CHECKING, cast
 
 from termz.io.errors import EmptyConditionsError, UnknownIdentifierError
 
-if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
-    from types import TracebackType
-
 __all__ = [
     "VALUELESS_OPERATORS",
     "ColumnOrder",
@@ -56,6 +52,10 @@ __all__ = [
     "SQLComparisonOperator",
     "SQLOrderByDirection",
 ]
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping, Sequence
+    from types import TracebackType
 
 _logger = logging.getLogger(__name__)
 

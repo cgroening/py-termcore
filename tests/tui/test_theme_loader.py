@@ -499,8 +499,29 @@ class TestThemePersistence:
 
         assert app.theme == name
 
-    def test_an_unknown_previous_theme_leaves_the_app_alone(
-        self, theme_root: Path, make_theme: MakeTheme, tmp_path: Path
+    def test_an_unknown_previous_theme_falls_back_to_the_default(
+        self, theme_root: Path, make_theme: MakeTheme, tmp_path: Path,
+        caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # A theme removed between two runs used to leave the app on Textual's
+        # own default, silently ignoring the default the caller passed.
+        make_theme(theme_root, "solar")
+        loader = custom_loader(theme_root)
+        app: App[None] = App()
+        loader.register_themes_in_textual_app(app)
+        config = tmp_path / "theme.json"
+        loader.save_theme_to_config("CUSTOM_gone", config)
+        default = f"{DEFAULT_CUSTOM_THEME_PREFIX}solar"
+
+        with caplog.at_level(logging.WARNING):
+            loader.set_previous_theme_in_textual_app(app, default, config)
+
+        assert app.theme == default
+        assert "is not registered" in caplog.text
+
+    def test_an_unknown_default_is_reported_and_nothing_changes(
+        self, theme_root: Path, make_theme: MakeTheme, tmp_path: Path,
+        caplog: pytest.LogCaptureFixture
     ) -> None:
         make_theme(theme_root, "solar")
         loader = custom_loader(theme_root)
@@ -510,9 +531,39 @@ class TestThemePersistence:
         config = tmp_path / "theme.json"
         loader.save_theme_to_config("CUSTOM_gone", config)
 
-        loader.set_previous_theme_in_textual_app(app, "CUSTOM_gone", config)
+        with caplog.at_level(logging.ERROR):
+            loader.set_previous_theme_in_textual_app(app, "CUSTOM_also_gone",
+                                                     config)
 
         assert app.theme == before
+        assert "is not registered either" in caplog.text
+
+
+class TestABrokenStylesheetDoesNotKillTheApp:
+    """reparse() used to run unguarded, so invalid TCSS crashed the app.
+
+    A library has no business taking the whole application down because a
+    theme it was handed will not parse.
+    """
+
+    async def test_the_application_survives_invalid_tcss(
+        self, theme_root: Path, make_theme: MakeTheme,
+        caplog: pytest.LogCaptureFixture
+    ) -> None:
+        make_theme(theme_root, "broken", css="this is not valid tcss {{{")
+        loader = custom_loader(theme_root)
+        app: App[None] = App()
+
+        async with app.run_test():
+            loader.register_themes_in_textual_app(app)
+
+            with caplog.at_level(logging.ERROR):
+                loader.load_theme_css(
+                    f"{DEFAULT_CUSTOM_THEME_PREFIX}broken", app
+                )
+
+            assert app.is_running
+            assert "could not be parsed" in caplog.text
 
 
 class TestThemeCycling:

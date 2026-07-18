@@ -35,6 +35,11 @@ from textual.containers import HorizontalGroup
 from textual.reactive import reactive
 from textual.widgets._footer import Footer, FooterKey
 
+__all__ = [
+    "FooterRow",
+    "MultiLineFooter",
+]
+
 
 class FooterRow(HorizontalGroup):
     """Horizontal row containing FooterKey widgets."""

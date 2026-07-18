@@ -80,12 +80,19 @@ Example
         tooltip: Cancel and close
         row: 0
 """
+import logging
 import re
 from dataclasses import replace
 from pathlib import Path
 
 import yaml
 from textual.binding import Binding, BindingType
+
+__all__ = [
+    "CustomBindings",
+]
+
+_logger = logging.getLogger(__name__)
 
 
 def _sort_key(binding: Binding) -> str:
@@ -202,8 +209,21 @@ class CustomBindings:
                 binding_id  = self._parse_id(binding.get("id"))
                 system      = self._parse_system(binding.get("system"))
 
-                # Skip if any required field is missing
+                # Skip if any required field is missing. Spelled out rather
+                # than derived from the list below, so the type checker can
+                # narrow the three values for the constructor call.
                 if key is None or action is None or description is None:
+                    missing = [
+                        name for name, value in (
+                            ("key", key),
+                            ("action", action),
+                            ("description", description),
+                        ) if value is None
+                    ]
+                    _logger.warning(
+                        "Skipping a binding in group %r: %s missing",
+                        group, ", ".join(missing)
+                    )
                     continue
 
                 binding_instance = Binding(
@@ -225,7 +245,15 @@ class CustomBindings:
                 else:
                     self._action_to_groups[action].append(group)
 
-                # Store row for this action
+                # Store row for this action. A second group claiming the
+                # same action overwrites the first one's footer row, which
+                # is worth saying rather than doing quietly.
+                if action in self._action_row_map:
+                    _logger.warning(
+                        "Action %r is declared more than once (%s); the "
+                        "footer row of the earlier binding is overwritten",
+                        action, ", ".join(self._action_to_groups[action])
+                    )
                 self._action_row_map[action] = int(binding.get("row", 0))
 
                 # Add action to global actions if applicable
@@ -330,6 +358,9 @@ class CustomBindings:
 
     def _tab_bindings(self, tab_name: str | None) -> list[BindingType]:
         """Returns the bindings of every tab group, or of one named tab."""
+        if tab_name is not None:
+            self._warn_if_unknown(tab_name.lower(), tab_name)
+
         bindings: list[BindingType] = []
         for group, group_bindings in self._bindings_dict.items():
             # Global and screen groups are appended by the callers instead
@@ -345,8 +376,24 @@ class CustomBindings:
     def _screen_bindings(self, screen_name: str) -> list[BindingType]:
         """Returns the bindings of one screen group."""
         group = f"{screen_name.lower()}_screen"
+        self._warn_if_unknown(group, screen_name)
 
         return list(self._bindings_dict.get(group, []))
+
+    def _warn_if_unknown(self, group: str, given_name: str) -> None:
+        """
+        Warns when a name matches no group in the YAML file.
+
+        Without this a typo is indistinguishable from a tab or screen that
+        genuinely declares no shortcuts of its own.
+        """
+        if group in self._bindings_dict:
+            return
+
+        _logger.warning(
+            "No binding group %r for name %r; returning only the global "
+            "bindings", group, given_name
+        )
 
     def _global_bindings(self) -> list[BindingType]:
         """Returns the always-visible bindings, as they were declared."""
@@ -436,11 +483,9 @@ class CustomBindings:
         """Parses the description field from the YAML binding definition."""
         return description
 
-    def _parse_show(self, show: str | None) -> bool:
+    def _parse_show(self, show: object) -> bool:
         """Parses the show field, defaulting to True."""
-        if show is None:
-            return True
-        return bool(show)
+        return self._parse_bool(show, field="show", default=True)
 
     def _parse_key_display(
         self, key: str | None, key_display: str | None
@@ -448,23 +493,24 @@ class CustomBindings:
         """
         Parses the key_display field of a binding.
 
-        A function key such as "f1" is rendered as "F1"; otherwise the
-        declared value is kept, and None leaves the rendering to Textual.
+        A declared value wins - the field exists to override how the key is
+        rendered. Without one, a function key such as "f1" becomes "F1", and
+        anything else returns None, which leaves the rendering to Textual.
         """
+        if key_display is not None:
+            return key_display
         if key is None:
             return None
 
         match = re.fullmatch(r"(f)(\d+)", key.lower())
         if match:
-            key_display = f"F{int(match.group(2))}"
+            return f"F{int(match.group(2))}"
 
-        return key_display
+        return None
 
-    def _parse_priority(self, priority: str | None) -> bool:
+    def _parse_priority(self, priority: object) -> bool:
         """Parses the priority field, defaulting to False."""
-        if priority is None:
-            return False
-        return bool(priority)
+        return self._parse_bool(priority, field="priority", default=False)
 
     def _parse_tooltip(self, tooltip: str | None) -> str:
         """Parses the tooltip field, defaulting to an empty string."""
@@ -476,12 +522,30 @@ class CustomBindings:
         """Parses the id field from the YAML binding definition."""
         return binding_id
 
-    def _parse_system(self, system: str | None) -> bool:
+    def _parse_system(self, system: object) -> bool:
         """
         Parses the system field, defaulting to False.
 
         A system binding is not overridden by a widget that captures input.
         """
-        if system is None:
-            return False
-        return bool(system)
+        return self._parse_bool(system, field="system", default=False)
+
+    def _parse_bool(self, value: object, field: str, *, default: bool) -> bool:
+        """
+        Reads a YAML boolean, falling back to the documented default.
+
+        Only a genuine boolean counts. `bool(value)` would turn the quoted
+        string "false" into True, so a quoted boolean would silently mean the
+        opposite of what it says.
+        """
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+
+        _logger.warning(
+            "Expected true or false for %r, got %r; using the default %r",
+            field, value, default
+        )
+
+        return default

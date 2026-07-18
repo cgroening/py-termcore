@@ -7,12 +7,33 @@ Included Features:
 - `linewrap`: Splits long text into multiple lines, respecting a maximum line
    width and avoiding word breaks when possible.
 - `charpos`: Returns all positions of a given character within a string.
+- `cell_width`: Counts the terminal cells a string occupies.
 - `str_with_fixed_width`: Truncates or pads a string to an exact width.
 
 These utilities are useful for simple text formatting tasks, especially when
 preparing console output or working with fixed-width layouts.
 
+Widths here are counted in terminal cells, not in code points: a CJK glyph
+occupies two cells and a combining mark none. Counting characters instead is
+what pushes a fixed-width column out of alignment as soon as the data is not
+plain ASCII.
+
 """
+
+import unicodedata
+from collections.abc import Iterable
+
+__all__ = [
+    "ALIGNMENTS",
+    "ALIGN_CENTER",
+    "ALIGN_LEFT",
+    "ALIGN_RIGHT",
+    "ELLIPSIS",
+    "cell_width",
+    "charpos",
+    "linewrap",
+    "str_with_fixed_width",
+]
 
 ALIGN_LEFT = "left"
 ALIGN_RIGHT = "right"
@@ -109,33 +130,68 @@ def charpos(text: str, char: str) -> list[int]:
     return [pos for pos, c in enumerate(text) if c == char]
 
 
+def cell_width(text: str) -> int:
+    """
+    Returns the number of terminal cells the given text occupies.
+
+    A character whose East Asian width is wide or fullwidth takes two cells,
+    a combining mark takes none, everything else takes one.
+
+    Parameters
+    ----------
+    text : str
+        The text to measure.
+
+    Returns
+    -------
+    int
+        The number of cells the text occupies when rendered.
+
+    Examples
+    --------
+    >>> cell_width("abc")
+    3
+    >>> cell_width("日本語")
+    6
+    """
+    return sum(_char_cells(char) for char in text)
+
+
+def _char_cells(char: str) -> int:
+    """Returns how many terminal cells a single character occupies."""
+    if unicodedata.combining(char):
+        return 0
+
+    return 2 if unicodedata.east_asian_width(char) in ("W", "F") else 1
+
+
 def str_with_fixed_width(
     text: str, width: int, align: str = ALIGN_LEFT
 ) -> str:
     """
-    Return a string truncated or padded to exactly `width` characters.
+    Return a string occupying exactly `width` terminal cells.
 
-    If the text exceeds the width it is truncated with an ellipsis (…). With
+    If the text is wider it is truncated with an ellipsis (…). With
     `align="right"` the tail of the text is kept and the ellipsis marks the
-    cut at the front; `align="left"` and `align="center"` keep the head, since
-    there is nothing left to centre once the text has been cut.
+    cut at the front; `align="left"` and `align="center"` keep the head,
+    since there is nothing left to centre once the text has been cut.
 
-    The width is counted in characters, not in terminal cells. Text
-    containing full-width characters therefore renders wider than `width`.
+    A double-width character cannot be split, so where one would straddle the
+    boundary the result is padded with a space to reach the width exactly.
 
     Parameters
     ----------
     text : str
         The input text to format.
     width : int
-        The exact output width in characters.
+        The exact output width in terminal cells.
     align : str
         One of 'left', 'right', or 'center'. Defaults to 'left'.
 
     Returns
     -------
     str
-        A string of exactly `width` characters.
+        A string occupying exactly `width` cells.
 
     Raises
     ------
@@ -150,15 +206,58 @@ def str_with_fixed_width(
     if width == 0:
         return ""
 
-    if len(text) > width:
-        if align == ALIGN_RIGHT:
-            # Sliced from len(text) rather than with a negative index:
-            # at width 1 the offset is 0, and text[-0:] is the whole string.
-            return ELLIPSIS + text[len(text) - (width - 1):]
-        return text[:width - 1] + ELLIPSIS
+    if cell_width(text) > width:
+        return _truncated(text, width, align)
+
+    return _padded(text, width, align)
+
+
+def _truncated(text: str, width: int, align: str) -> str:
+    """Cuts the text to `width` cells, marking the cut with an ellipsis."""
+    room = width - _char_cells(ELLIPSIS)
+
+    if align == ALIGN_RIGHT:
+        kept = _take_cells(reversed(text), room)[::-1]
+        return _pad_left(ELLIPSIS + kept, width)
+
+    kept = _take_cells(text, room)
+
+    return _pad_right(kept + ELLIPSIS, width)
+
+
+def _take_cells(chars: Iterable[str], room: int) -> str:
+    """Takes characters while they still fit into `room` cells."""
+    taken: list[str] = []
+    used = 0
+    for char in chars:
+        cells = _char_cells(char)
+        if used + cells > room:
+            break
+        taken.append(char)
+        used += cells
+
+    return "".join(taken)
+
+
+def _padded(text: str, width: int, align: str) -> str:
+    """Pads the text with spaces until it occupies `width` cells."""
+    missing = width - cell_width(text)
 
     if align == ALIGN_LEFT:
-        return text.ljust(width)
+        return text + " " * missing
     if align == ALIGN_RIGHT:
-        return text.rjust(width)
-    return text.center(width)
+        return " " * missing + text
+
+    left = missing // 2
+
+    return " " * left + text + " " * (missing - left)
+
+
+def _pad_right(text: str, width: int) -> str:
+    """Fills up to `width` cells on the right, for a straddling glyph."""
+    return text + " " * (width - cell_width(text))
+
+
+def _pad_left(text: str, width: int) -> str:
+    """Fills up to `width` cells on the left, for a straddling glyph."""
+    return " " * (width - cell_width(text)) + text

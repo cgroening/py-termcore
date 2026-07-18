@@ -33,7 +33,7 @@ Four sub-packages, each a coherent purpose rather than a layer:
 - `tui` – Textual helpers: theme loading, key bindings, custom widgets.
 - `util` – dates, strings, index arithmetic, logging, debugging decorators.
 
-The public API of each package is re-exported through `from .module import *` in its `__init__.py`, as section 3.2.2 requires. That has a consequence which has already caused a defect: a module without `__all__` re-exports its own imports too. `termz/util/datetime.py` re-exported the `datetime` class over the submodule of the same name, so `import termz.util.datetime` handed back the class. Three modules declare `__all__` today; a new one should, and `from termz import *` currently exposes 141 names, most of them accidental.
+The public API of each package is re-exported through `from .module import *` in its `__init__.py`, as section 3.2.2 requires. That has a consequence which has already caused a defect: a module without `__all__` re-exports its own imports too. `termz/util/datetime.py` re-exported the `datetime` class over the submodule of the same name, so `import termz.util.datetime` handed back the class. Every module declares `__all__`, and a new one has to as well – `tests/test_public_api.py` fails otherwise, and also checks that no borrowed name such as `json` or `Path` reaches the package namespace.
 
 ## The defect this repository keeps producing
 

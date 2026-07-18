@@ -93,6 +93,12 @@ class TestRoundTrip:
 
 
 class TestDateDiff:
+    """Counted in local calendar days, not in 86400-second blocks.
+
+    Dividing by 86400 reported -1 days for a difference of one second in the
+    wrong direction, and was off by one across every daylight saving switch.
+    """
+
     def test_counts_whole_days(self) -> None:
         assert date_diff(10 * SECONDS_PER_DAY, 3 * SECONDS_PER_DAY) == 7
 
@@ -101,6 +107,32 @@ class TestDateDiff:
 
     def test_a_later_second_argument_gives_a_negative_result(self) -> None:
         assert date_diff(3 * SECONDS_PER_DAY, 10 * SECONDS_PER_DAY) == -7
+
+    def test_the_same_local_day_is_zero_whatever_the_clock_says(self) -> None:
+        # One second apart used to report -1 days.
+        morning = date_to_timestamp("18.07.2026")
+        assert morning is not None
+
+        assert date_diff(morning, morning + 1) == 0
+        assert date_diff(morning + 23 * 3600, morning) == 0
+
+    def test_midnight_to_midnight_is_one_day(self) -> None:
+        first = date_to_timestamp("18.07.2026")
+        second = date_to_timestamp("19.07.2026")
+        assert first is not None
+        assert second is not None
+
+        assert date_diff(second, first) == 1
+
+    def test_a_span_across_the_dst_switch_is_not_off_by_one(self) -> None:
+        # Berlin loses an hour on 29.03.2026, so that span is 23 hours long
+        # and the old arithmetic counted it as zero days.
+        before = date_to_timestamp("28.03.2026")
+        after = date_to_timestamp("29.03.2026")
+        assert before is not None
+        assert after is not None
+
+        assert date_diff(after, before) == 1
 
 
 class TestToday:

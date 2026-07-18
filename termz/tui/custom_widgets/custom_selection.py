@@ -7,6 +7,10 @@ from textual.strip import Strip
 from textual.widgets import SelectionList
 from textual.widgets._toggle_button import ToggleButton
 
+__all__ = [
+    "CustomSelectionList",
+]
+
 _SelectionType = TypeVar("_SelectionType")
 
 

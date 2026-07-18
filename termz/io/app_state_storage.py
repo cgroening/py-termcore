@@ -24,6 +24,10 @@ from typing import cast
 from termz.io.errors import StateFileError
 from termz.util.singleton import Singleton
 
+__all__ = [
+    "AppStateStorage",
+]
+
 
 class AppStateStorage(metaclass=Singleton):
     """

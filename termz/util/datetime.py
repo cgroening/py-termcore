@@ -111,7 +111,12 @@ def date_to_timestamp(
 
 def date_diff(timestamp1: int, timestamp2: int) -> int:
     """
-    Calculates the difference between two timestamps.
+    Calculates the number of calendar days between two timestamps.
+
+    Counted as local calendar dates rather than as 86400-second blocks, so
+    the time of day does not matter and a span crossing a daylight saving
+    switch is not off by one. Two moments on the same local day are 0 days
+    apart, whether they are a second or twenty hours apart.
 
     Parameters
     ----------
@@ -123,12 +128,13 @@ def date_diff(timestamp1: int, timestamp2: int) -> int:
     Returns
     -------
     int
-        Number of days between the given timestamps.
+        Number of days between the given timestamps, negative when the
+        second one is the later of the two.
     """
-    seconds_per_day = 86400  # 60 * 60 * 24
-    diff_seconds = timestamp1 - timestamp2
+    first = datetime.fromtimestamp(timestamp1, tz=UTC).astimezone().date()
+    second = datetime.fromtimestamp(timestamp2, tz=UTC).astimezone().date()
 
-    return diff_seconds // seconds_per_day
+    return (first - second).days
 
 
 def today_timestamp() -> int:

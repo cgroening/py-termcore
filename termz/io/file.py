@@ -26,6 +26,11 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
+__all__ = [
+    "File",
+    "FolderItem",
+]
+
 
 @dataclass(slots=True)
 class FolderItem:

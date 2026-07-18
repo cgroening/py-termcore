@@ -27,6 +27,10 @@ from textual.widget import Widget
 from textual.widgets import DataTable
 from textual.widgets._data_table import Column, ColumnKey
 
+__all__ = [
+    "CustomDataTable",
+]
+
 _CellType = TypeVar("_CellType")
 
 

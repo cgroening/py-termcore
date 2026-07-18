@@ -19,6 +19,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `termz/tui/custom_widgets/__init__.py`. The directory was an implicit namespace package, which is one packaging tool away from being dropped from the wheel entirely
 - `clamped_index`, `timing_ns`, `File.folder_content_recursive`, `ThemeLoader.custom_only`, `CustomBindings.sorted_by_key`, `CustomBindings.get_screen_bindings` and `CustomBindings.get_screen_row_map`, each replacing a boolean parameter (section 1.1.2)
 - `DateFormat`, an enum replacing the `english_format` flag of the datetime helpers
+- `cell_width`, which counts the terminal cells a string occupies rather than its code points
+- An `__all__` in every module, so that `from termz import *` carries the public API instead of every module's own imports. The star export shrank from 141 names to 85
 
 ### Changed
 
@@ -40,6 +42,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `AppStateStorage`: A failure to read, create or write the state file raises `StateFileError` instead of printing a message and calling `sys.exit()`. A library taking the whole process down left the caller no way to react
 - `termz.util.debug`: The decorators log at debug level through a module logger instead of printing to stdout
 - File and directory handling moved from `os.path` to `pathlib` throughout
+- `str_with_fixed_width` counts terminal cells instead of code points, so a column holding CJK text or emoji stays aligned. A double-width glyph cannot be split, so where one would straddle the boundary the result is padded to reach the width exactly. Breaking for anyone who relied on the returned string having exactly `width` characters
+- `date_diff` compares local calendar dates instead of dividing by 86400. Two moments on the same day are 0 days apart whatever the clock says, and a span crossing a daylight saving switch is no longer off by one
+- `CustomBindings` reads `show`, `priority` and `system` as genuine YAML booleans. The quoted string `"false"` used to be read as `True`, so a quoted boolean silently meant its opposite; it now falls back to the documented default and says so
+- `CustomBindings`: an explicitly declared `key_display` is no longer overridden for function keys. The field exists to override how a key is rendered
 
 ### Fixed
 
@@ -64,6 +70,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `CustomDataTable.flexible_columns` and `AppStateStorage._json_dict` were class attributes with mutable defaults, so every instance in a process shared one object. Same defect as in `ThemeLoader` and `CustomBindings`
 - `File.change_extension` printed the split file name to stdout, a debug statement left in a pure function
 - A message in `AppStateStorage` was in German, against the rule that all visible text is English
+- `ThemeLoader.set_previous_theme_in_textual_app` did nothing at all when the stored theme was no longer registered, so a theme removed between two runs left the application on Textual's default rather than on the `default_theme_name` the caller passed. It now falls back explicitly and reports both that and the case where the default is unknown too
+- `ThemeLoader` called `Stylesheet.reparse()` unguarded, so a theme shipping invalid TCSS took the whole application down from inside the library. The failure is logged and the previous stylesheet is kept
+- `CustomBindings` was silent in three places that now warn: a binding dropped for a missing `key`, `action` or `description`, a second group claiming an action name and overwriting the first one's footer row, and a tab or screen name matching no group at all
 
 ### Removed
 

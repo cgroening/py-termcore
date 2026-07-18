@@ -40,25 +40,25 @@ All four were diagnosed from termplate but had to be fixed here. All four are do
 
 Noticed while fixing the above, deliberately left alone to keep that change focused.
 
-- [ ] `set_previous_theme_in_textual_app` silently does nothing when the stored theme is not registered – a theme removed between two runs leaves the app on Textual's default rather than on the `default_theme_name` the caller passed, and says so in neither the log nor the return value. It should fall back to the default explicitly and report it.
-- [ ] `include_standard_themes: bool` and `_load_themes(standard_themes: bool)` are flag arguments, which section 1.1.2 of the style guide forbids. Changing the first is a breaking API change and belongs with a release.
-- [ ] `_apply_stylesheet` calls `app.stylesheet.reparse()` unguarded, so a theme shipping invalid TCSS takes the whole application down. Decide whether that should be reported and skipped instead – failing loudly may well be right, but it should be a decision rather than an accident.
+- [x] `set_previous_theme_in_textual_app` silently does nothing when the stored theme is not registered – a theme removed between two runs leaves the app on Textual's default rather than on the `default_theme_name` the caller passed, and says so in neither the log nor the return value. It should fall back to the default explicitly and report it.
+- [x] `include_standard_themes: bool` and `_load_themes(standard_themes: bool)` are flag arguments, which section 1.1.2 of the style guide forbids. Changing the first is a breaking API change and belongs with a release. Done earlier than planned: the tooling round removed both while adopting the FBT rules - `ThemeLoader.custom_only` replaced the constructor flag and `_load_themes` became `_load_standard_themes` and `_load_custom_themes`.
+- [x] `_apply_stylesheet` calls `app.stylesheet.reparse()` unguarded, so a theme shipping invalid TCSS takes the whole application down. Decide whether that should be reported and skipped instead – failing loudly may well be right, but it should be a decision rather than an accident.
 
 ## Further findings in CustomBindings
 
 Noticed while writing its tests, deliberately left alone to keep that change focused.
 
-- [ ] A binding missing `key`, `action` or `description` is dropped silently. Nothing is logged, so a typo in `bindings.yaml` costs a shortcut and says nothing.
-- [ ] Two groups declaring the same action name both land in `action_to_groups`, but `action_row_map` keeps only the last one – the earlier binding silently moves to the other footer row.
-- [ ] `get_bindings` with a `tab_name` or `screen_name` that matches no group returns just the globals instead of complaining, so a typo looks like a tab with no shortcuts.
-- [ ] `show`, `priority` and `system` are read with `bool(...)`, so the YAML string `"false"` is `True`. Only an unquoted `false` behaves as written.
-- [ ] `_parse_key_display` overrides an explicitly declared `key_display` for function keys, and returns `None` rather than the key when neither applies, contrary to what its docstring said.
+- [x] A binding missing `key`, `action` or `description` is dropped silently. Nothing is logged, so a typo in `bindings.yaml` costs a shortcut and says nothing.
+- [x] Two groups declaring the same action name both land in `action_to_groups`, but `action_row_map` keeps only the last one – the earlier binding silently moves to the other footer row.
+- [x] `get_bindings` with a `tab_name` or `screen_name` that matches no group returns just the globals instead of complaining, so a typo looks like a tab with no shortcuts.
+- [x] `show`, `priority` and `system` are read with `bool(...)`, so the YAML string `"false"` is `True`. Only an unquoted `false` behaves as written.
+- [x] `_parse_key_display` overrides an explicitly declared `key_display` for function keys, and returns `None` rather than the key when neither applies, contrary to what its docstring said.
 
 ## Further findings in the util modules
 
-- [ ] `date_diff` divides by 86400, so a difference of one second in the wrong direction reports -1 days, and any span crossing a daylight saving switch is off by one. Deciding between "whole 24-hour periods" and "calendar days apart" is a semantic choice, not a bug fix.
-- [ ] `str_with_fixed_width` counts code points, not terminal cells. CJK text and emoji therefore render wider than the requested width, which defeats the purpose of the function. Fixing it properly needs an East-Asian-width table, and section 1.2.7 requires asking before adding a dependency.
-- [ ] Only `util/datetime.py` declares `__all__`, and only because its star-export shadowed the submodule itself. Every other module leaks its imports into the package namespace – `termz.io.database` exports `sqlite3`, `Enum` and `TracebackType`, for instance. Section 1.2.6 asks for a small public interface; this is the opposite.
+- [x] `date_diff` divides by 86400, so a difference of one second in the wrong direction reports -1 days, and any span crossing a daylight saving switch is off by one. Deciding between "whole 24-hour periods" and "calendar days apart" is a semantic choice, not a bug fix.
+- [x] `str_with_fixed_width` counts code points, not terminal cells. CJK text and emoji therefore render wider than the requested width, which defeats the purpose of the function. Fixing it properly needs an East-Asian-width table, and section 1.2.7 requires asking before adding a dependency. Corrected: Python ships that table, so no dependency was needed. `cell_width` in `util/string.py` counts cells with `unicodedata`, and `str_with_fixed_width` is built on it.
+- [x] Only `util/datetime.py` declares `__all__`, and only because its star-export shadowed the submodule itself. Every other module leaks its imports into the package namespace – `termz.io.database` exports `sqlite3`, `Enum` and `TracebackType`, for instance. Section 1.2.6 asks for a small public interface; this is the opposite.
 
 ## Release
 

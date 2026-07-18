@@ -3,6 +3,10 @@
 import logging
 from pathlib import Path
 
+__all__ = [
+    "setup_logging",
+]
+
 
 def setup_logging(appname: str, level: int = logging.DEBUG) -> None:
     """

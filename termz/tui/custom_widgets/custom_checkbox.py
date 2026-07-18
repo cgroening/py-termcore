@@ -3,6 +3,10 @@
 from textual.events import Callback, Mount
 from textual.widgets import Checkbox
 
+__all__ = [
+    "CustomCheckbox",
+]
+
 
 class CustomCheckbox(Checkbox):
     """
