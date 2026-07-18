@@ -6,13 +6,13 @@ termz is the foundation under termplate. That ordering matters for how this list
 
 ## Tests
 
-termz has 3562 lines of Python and not a single test. There is no test dependency, no pytest configuration and no `tests/` directory. For comparison, ratada carries 389 test functions.
+The pytest, coverage and dev-dependency setup now exists, and `termz/tui/theme_loader.py` is covered. Everything else is still untested, and the coverage gate in `pyproject.toml` merely holds the level reached so far – raise `fail_under` with every module that gains tests.
 
-The practical consequence is already documented: of the four theme bugs that held up termplate, three live in `termz/tui/theme_loader.py`, and each of them would have been caught by one test. Today the only thing exercising termz is termplate's suite, incidentally, through the parts termplate happens to use.
+The practical consequence was already documented before the first test existed: of the four theme bugs that held up termplate, three lived in `termz/tui/theme_loader.py`, and each of them would have been caught by one test. Writing that suite immediately surfaced a fifth and a sixth defect that nobody had noticed.
 
 Ordered by how much a test would buy:
 
-- [ ] `termz/tui/theme_loader.py` – the module with the most silent behaviour and all four known bugs: theme discovery, name prefixing, CSS resolution, persistence and cycling. Nothing here fails loudly when it goes wrong; it just renders the wrong colours.
+- [x] `termz/tui/theme_loader.py` – the module with the most silent behaviour and all four known bugs: theme discovery, name prefixing, CSS resolution, persistence and cycling. Nothing here fails loudly when it goes wrong; it just renders the wrong colours.
 - [ ] `termz/tui/custom_bindings.py` – the group and prefix contract (`_global`, `<name>_tab`, `<name>_screen`) that every derived app depends on and that no consumer can verify from the outside.
 - [ ] `termz/io/database.py` – it assembles SQL strings. That is pure, side-effect-light logic and therefore the cheapest meaningful coverage in the repository.
 - [ ] `termz/util/datetime.py`, `termz/util/index.py`, `termz/util/string.py` – pure functions with obvious edge cases (empty input, boundaries, wrapping).
@@ -25,12 +25,22 @@ Ordered by how much a test would buy:
 
 ## Bugs found while hardening termplate
 
-All four were diagnosed from termplate but have to be fixed here.
+All four were diagnosed from termplate but had to be fixed here. All four are done; the two below them were found while fixing them and are done as well.
 
-- [ ] `ThemeLoader._theme_names` and `_theme_data` are class attributes with mutable defaults that `__init__` never resets, and `register_themes_in_textual_app` re-prefixes the same `Theme` objects on every call. A second app instance in one process therefore sees `CUSTOM_CUSTOM_classic-black`, a third `CUSTOM_CUSTOM_CUSTOM_...`. Production gets away with it because there is one app per process; a test suite that builds an app per test does not. termplate carries a `reset_theme_loader` fixture purely to work around this, and it can be deleted once the state is per instance.
-- [ ] The coupling "a theme directory's name must equal the `name` in its `theme.py`" is undocumented and unenforced, because themes are stored under the directory name but their CSS is resolved by the theme name. Breaking it registers the theme and silently drops its stylesheet – the failure termplate shipped with. Either key both lookups the same way or refuse a mismatch loudly.
-- [ ] `ThemeLoader` logs through the root logger (`logging.warning(...)`) instead of `logging.getLogger(__name__)`, so its diagnostics cannot be filtered per module and surface as `WARNING:root:` in every consumer.
-- [ ] Cycling themes also walks Textual's built-in themes, which have no termz stylesheet, so each one logs "No CSS files found for theme: textual-dark". The theme renders correctly, so this is noise rather than breakage – but a warning that fires during normal use trains people to ignore warnings. Either restrict cycling to registered themes or lower the level for the built-ins.
+- [x] `ThemeLoader._theme_names` and `_theme_data` are class attributes with mutable defaults that `__init__` never resets, and `register_themes_in_textual_app` re-prefixes the same `Theme` objects on every call. A second app instance in one process therefore sees `CUSTOM_CUSTOM_classic-black`, a third `CUSTOM_CUSTOM_CUSTOM_...`. Production gets away with it because there is one app per process; a test suite that builds an app per test does not. termplate carries a `reset_theme_loader` fixture purely to work around this, and it can be deleted once the state is per instance. Fixed: state is per instance, and the prefix is applied once at load time to a copy of the theme, so registration mutates nothing. The fixture in termplate is gone.
+- [x] The coupling "a theme directory's name must equal the `name` in its `theme.py`" is undocumented and unenforced, because themes are stored under the directory name but their CSS is resolved by the theme name. Breaking it registers the theme and silently drops its stylesheet – the failure termplate shipped with. Either key both lookups the same way or refuse a mismatch loudly. Fixed: both are keyed by the registered name, so the coupling no longer exists rather than being enforced. A duplicate name within one prefix is refused with an error.
+- [x] `ThemeLoader` logs through the root logger (`logging.warning(...)`) instead of `logging.getLogger(__name__)`, so its diagnostics cannot be filtered per module and surface as `WARNING:root:` in every consumer. Fixed, and the same lines moved to lazy `%`-formatting with `%r`.
+- [x] Cycling themes also walks Textual's built-in themes, which have no termz stylesheet, so each one logs "No CSS files found for theme: textual-dark". The theme renders correctly, so this is noise rather than breakage – but a warning that fires during normal use trains people to ignore warnings. Either restrict cycling to registered themes or lower the level for the built-ins. Fixed by lowering the level: the built-ins were only half the noise, since ten of the sixteen bundled themes ship no stylesheet either and warned just as loudly. Cycling deliberately still reaches the built-ins.
+- [x] From the second `ThemeLoader` in a process on, the bundled themes were not found at all. `_load_themes` only inserted a theme folder's parent into `sys.path` if it was absent, so on the second load termz's own folder sat behind the consumer's, and the package `themes` resolved to the wrong one – every bundled folder reported "no theme.py". The shared class-level registry hid this completely, because the second loader still saw the first one's themes. Fixed by importing each `theme.py` by file path via `importlib.util`, which removes the `sys.path` and `sys.modules` handling entirely.
+- [x] `_remove_all_theme_css` compared against termz's own theme directory, so the stylesheet of a consumer's theme was never removed on a switch and stayed applied on top of every theme afterwards. Fixed by removing exactly the files the loader read. The re-parse now also runs when the new theme has no stylesheet, which previously left the removal unapplied.
+
+## Further findings in ThemeLoader
+
+Noticed while fixing the above, deliberately left alone to keep that change focused.
+
+- [ ] `set_previous_theme_in_textual_app` silently does nothing when the stored theme is not registered – a theme removed between two runs leaves the app on Textual's default rather than on the `default_theme_name` the caller passed, and says so in neither the log nor the return value. It should fall back to the default explicitly and report it.
+- [ ] `include_standard_themes: bool` and `_load_themes(standard_themes: bool)` are flag arguments, which section 1.1.2 of the style guide forbids. Changing the first is a breaking API change and belongs with a release.
+- [ ] `_apply_stylesheet` calls `app.stylesheet.reparse()` unguarded, so a theme shipping invalid TCSS takes the whole application down. Decide whether that should be reported and skipped instead – failing loudly may well be right, but it should be a decision rather than an accident.
 
 ## Release
 

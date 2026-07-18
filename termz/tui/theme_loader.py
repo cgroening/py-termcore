@@ -1,9 +1,11 @@
+"""Discovery, registration and stylesheet handling of Textual themes."""
+
 import logging
-import importlib
+import importlib.util
 import os
 import json
-import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from types import ModuleType
 from typing import cast
 from pathlib import Path
 from textual.app import App
@@ -15,11 +17,12 @@ DEFAULT_CUSTOM_THEME_PREFIX = "CUSTOM_"
 SCRIPT_DIR = Path(__file__).parent.parent
 STANDARD_THEMES_DIR = SCRIPT_DIR / "tui/themes"
 
+_logger = logging.getLogger(__name__)
 
-@dataclass(frozen=False, slots=True)
+
+@dataclass(frozen=True, slots=True)
 class ThemeData:
     """Data class to hold information of a single theme."""
-    name: str
     prefix: str
     textual_theme: Theme
     css_files: list[str] | None = None
@@ -29,10 +32,14 @@ class ThemeLoader:
     """
     Loads and manages themes for Textual applications.
 
-    The themes are expected to be in subfolder of `THEME_FOLDER`, each
+    The themes are expected to be in subfolders of the theme folder, each
     containing a `theme.py` file defining a `TEXTUAL_THEME` variable.
-    Additionally, any number of `.css` oder `.tcc` files can be included in the
+    Additionally, any number of `.css` or `.tcss` files can be included in the
     theme folder.
+
+    A theme is identified by the `name` of its `TEXTUAL_THEME` plus the prefix
+    it is registered under; the name of its folder carries no meaning and is
+    free to differ.
 
     This class dynamically imports the theme modules, registers them and makes
     them available for use in the application.
@@ -40,14 +47,14 @@ class ThemeLoader:
     _theme_folder: str | None
     _termz_theme_prefix: str
     _custom_theme_prefix: str
-    _theme_names: list[str] = []
-    _theme_data: dict[str, ThemeData] = {}
+    _theme_names: list[str]
+    _theme_data: dict[str, ThemeData]
 
 
     def __init__(
         self, theme_folder: str | None = None,
-        termz_theme_prefix: str = DEFAULT_TERMZ_THEME_PREFIX or "",
-        custom_theme_prefix: str = DEFAULT_CUSTOM_THEME_PREFIX or "",
+        termz_theme_prefix: str = DEFAULT_TERMZ_THEME_PREFIX,
+        custom_theme_prefix: str = DEFAULT_CUSTOM_THEME_PREFIX,
         include_standard_themes: bool = True
     ) -> None:
         """
@@ -57,28 +64,25 @@ class ThemeLoader:
         self._theme_folder = theme_folder
         self._termz_theme_prefix = termz_theme_prefix
         self._custom_theme_prefix = custom_theme_prefix
+        self._theme_names = []
+        self._theme_data = {}
         if include_standard_themes:
-            self._load_themes(standard_themes=include_standard_themes)
+            self._load_themes(standard_themes=True)
         self._load_themes()  # Custom themes
         self._theme_names.sort()
 
     def _load_themes(self, standard_themes: bool = False) -> None:
-        """Loads themes from the specified folder and register them."""
+        """Loads themes from the specified folder and registers them."""
         result = self._generate_theme_folder_path_and_prefix(standard_themes)
         if not result:
             return
 
         prefix, theme_folder_path = result
-        parent = theme_folder_path.parent
-        folder_name = theme_folder_path.name
-
-        if str(parent) not in sys.path:
-            sys.path.insert(0, str(parent))
-
-        self._clear_package_cache(folder_name)
-        self._process_themes(folder_name, prefix, theme_folder_path)
-        logging.info(
-            f"Found {len(self._theme_names)} themes in \"{theme_folder_path}\"."
+        count_before = len(self._theme_names)
+        self._process_themes(prefix, theme_folder_path)
+        _logger.info(
+            "Found %d themes in %r",
+            len(self._theme_names) - count_before, str(theme_folder_path)
         )
 
     def _generate_theme_folder_path_and_prefix(self, standard_themes: bool) \
@@ -92,103 +96,125 @@ class ThemeLoader:
             prefix = self._termz_theme_prefix
         else:
             if not self._theme_folder:
-                return
+                return None
             theme_folder_path = Path(self._theme_folder).resolve()
             prefix = self._custom_theme_prefix
 
         if not theme_folder_path.is_dir():
-            logging.warning(
-                f"Theme folder \"{theme_folder_path}\" not found. Skipping."
+            _logger.warning(
+                "Theme folder %r not found. Skipping.", str(theme_folder_path)
             )
-            return
+            return None
 
         return prefix, theme_folder_path
 
-    def _clear_package_cache(self, folder_name: str) -> None:
-        """
-        Clears the entire package from the module cache, including the parent
-        package itself - otherwise Python reuses a stale entry pointing to the
-        previously loaded folder (critical when both folders share the
-        same name, e.g. "themes") and prevents loading new themes.
-        """
-        for key in list(sys.modules.keys()):
-            if key == folder_name or key.startswith(f"{folder_name}."):
-                del sys.modules[key]
-
-    def _process_themes(
-        self, folder_name: str, prefix: str, theme_folder_path: Path
-    ) -> None:
+    def _process_themes(self, prefix: str, theme_folder_path: Path) -> None:
         """Imports and registers themes from the given folder path."""
-        for item in os.listdir(theme_folder_path):
+        # Sorted, so that a refused duplicate is always the same one
+        for item in sorted(os.listdir(theme_folder_path)):
             full_path = theme_folder_path / item
             if item.startswith(".") or item.startswith("_") \
             or not full_path.is_dir():
                 continue
 
-            module_name = f"{folder_name}.{item}.theme"
-            self._import_and_register_theme(
-                item, prefix, module_name, str(full_path)
-            )
-
-    def _get_css_files_for_theme(self, theme_folder_path: str) -> list[str]:
-        """ Generates a list of CSS files in the given folder."""
-        css_files: list[str] = []
-        for file_name in os.listdir(theme_folder_path):
-            if file_name.endswith(".css") or file_name.endswith(".tcss"):
-                css_files.append(os.path.join(theme_folder_path, file_name))
-        return css_files
+            self._import_and_register_theme(prefix, full_path)
 
     def _import_and_register_theme(
-        self, theme_name: str, prefix: str, module_name: str, full_path: str
+        self, prefix: str, theme_folder_path: Path
     ) -> None:
         """
-        Imports a theme module and register its theme.
+        Imports a theme module and registers its theme.
 
         Raises
         ------
-        ModuleNotFoundError
-            If the theme module cannot be imported.
         Exception
-            If any other error occurs during theme loading.
+            If any error occurs while executing the theme module.
         """
+        folder_name = theme_folder_path.name
+        theme_file = theme_folder_path / "theme.py"
+        if not theme_file.is_file():
+            _logger.warning(
+                "Skipping theme folder %r (no theme.py)", folder_name
+            )
+            return
+
         try:
-            # Import the theme module (theme.py)
-            theme_module = importlib.import_module(module_name)
+            theme_module = self._import_theme_module(theme_file)
             textual_theme = getattr(theme_module, "TEXTUAL_THEME", None)
-            css_files = self._get_css_files_for_theme(full_path)
 
             # Abort if no TEXTUAL_THEME variable is defined
             if not isinstance(textual_theme, Theme):
-                logging.warning(
-                    f"Skipping theme \"{theme_name}\" (no TEXTUAL_THEME defined)"
+                _logger.warning(
+                    "Skipping theme folder %r (no TEXTUAL_THEME defined)",
+                    folder_name
                 )
                 return
 
             # Register the theme
-            self._save_theme_data(theme_name, prefix, textual_theme, css_files)
-            logging.info(f"Registered theme: {theme_name}")
-        except ModuleNotFoundError:
-            logging.warning(f"Skipping theme \"{theme_name}\" (no theme.py)")
+            css_files = self._get_css_files_for_theme(theme_folder_path)
+            self._save_theme_data(prefix, textual_theme, css_files)
         except Exception as e:
-            logging.error(f"Error loading theme \"{theme_name}\": {e}")
+            _logger.error("Error loading theme folder %r: %s", folder_name, e)
+
+    def _import_theme_module(self, theme_file: Path) -> ModuleType:
+        """
+        Imports a theme.py by path, leaving sys.path and sys.modules alone.
+
+        Loading by path is what keeps theme folders independent of each
+        other. Importing them as a package named after the folder made the
+        first folder loaded in a process shadow every later one of the same
+        name, so a second application lost the themes of the toolkit.
+        """
+        spec = importlib.util.spec_from_file_location(
+            f"_termz_theme_{theme_file.parent.name}", theme_file
+        )
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Cannot load a theme module from {theme_file}")
+
+        theme_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(theme_module)
+        return theme_module
+
+    def _get_css_files_for_theme(self, theme_folder_path: Path) -> list[str]:
+        """Generates a list of CSS files in the given folder."""
+        css_files: list[str] = []
+        for file_name in os.listdir(theme_folder_path):
+            if file_name.endswith(".css") or file_name.endswith(".tcss"):
+                css_files.append(str(theme_folder_path / file_name))
+        return css_files
 
     def _save_theme_data(
-        self, name: str,
-        prefix: str,
+        self, prefix: str,
         theme_instance: Theme,
         css_files: list[str] | None = None
     ) -> None:
         """
-        Saves the theme data into the `theme_data` dictionary and adds the theme
-        name to the list of all names.
+        Saves the theme data into the `theme_data` dictionary and adds the
+        theme name to the list of all names.
+
+        The prefix is applied to a copy of the theme, so that the
+        `TEXTUAL_THEME` constant of the imported module keeps the name it was
+        written with and repeated registration cannot stack prefixes.
         """
-        self._theme_names.append(name)
-        self._theme_data[name] = ThemeData(
-            name=name,
+        registered_name = f"{prefix}{theme_instance.name}"
+        if registered_name in self._theme_data:
+            _logger.error(
+                "Duplicate theme %r, keeping the one that was loaded first",
+                registered_name
+            )
+            return
+
+        self._theme_names.append(registered_name)
+        self._theme_data[registered_name] = ThemeData(
             prefix=prefix,
-            textual_theme=theme_instance,
+            textual_theme=replace(
+                theme_instance,
+                name=registered_name,
+                variables=dict(theme_instance.variables)
+            ),
             css_files=css_files
         )
+        _logger.info("Registered theme: %r", registered_name)
 
     def get_previously_used_theme(
         self, theme_config_file: Path, default_theme_name: str
@@ -220,11 +246,12 @@ class ThemeLoader:
                 with open(theme_config_file, "r") as f:
                     config = cast(dict[str, str], json.load(f))
                     if "theme" not in config:
-                        logging.warning(
-                            f"Invalid theme config format in {theme_config_file}."
+                        _logger.warning(
+                            "Invalid theme config format in %r",
+                            str(theme_config_file)
                         )
                         return default_theme_name
-                    return config.get("theme", theme_config_file.name)
+                    return config["theme"]
             except (json.JSONDecodeError, IOError):
                 return default_theme_name
         return default_theme_name
@@ -233,23 +260,26 @@ class ThemeLoader:
         """
         Registers all loaded themes in the given Textual application.
 
+        Registration reads the stored themes without modifying them, so the
+        same loader can be registered in more than one application.
+
         Parameters
         ----------
         app : App
             The instance of the Textual application.
         """
         # Sort themes, first TERMZ_THEME_PREFIX, then CUSTOM_THEME_PREFIX
-        self._theme_names.sort( key=lambda name: (
-            0 if self._theme_data[name].prefix == self._termz_theme_prefix else 1,
-            name
-        ) )
+        self._theme_names.sort(key=self._registration_order)
 
         # Loop through name list instead of dict to keep alphabetic order
         for theme_name in self._theme_names:
-            theme_data = self._theme_data[theme_name]
-            theme_data.textual_theme.name = \
-                f"{theme_data.prefix}{theme_data.textual_theme.name}"
-            app.register_theme(theme_data.textual_theme)
+            app.register_theme(self._theme_data[theme_name].textual_theme)
+
+    def _registration_order(self, theme_name: str) -> tuple[int, str]:
+        """Sorts termz themes before custom ones, alphabetically within each."""
+        is_custom = \
+            self._theme_data[theme_name].prefix != self._termz_theme_prefix
+        return int(is_custom), theme_name
 
     def set_previous_theme_in_textual_app(
         self, app: App[None], default_theme_name: str, theme_config_file: Path
@@ -272,7 +302,7 @@ class ThemeLoader:
         if theme_name in app.available_themes:
             app.theme = theme_name
 
-        logging.info(f"Set previous theme: {theme_name}")
+        _logger.info("Set previous theme: %r", theme_name)
 
     def save_theme_to_config(
         self, theme_name: str, theme_config_file: Path
@@ -289,64 +319,73 @@ class ThemeLoader:
             with open(theme_config_file, "w") as f:
                 json.dump({"theme": theme_name}, f)
         except IOError as e:
-            logging.error(f"Could not save theme config: {e}")
+            _logger.error("Could not save theme config: %s", e)
 
     def load_theme_css(self, theme_name: str, app: App[None]) -> None:
         """
         Loads the CSS files for the current theme.
 
+        A theme without a stylesheet and a theme this loader never registered
+        (one of Textual's built-ins, for instance) are both normal: the CSS of
+        the previous theme is removed and nothing is loaded in its place.
+
         Parameters
         ----------
         theme_name : str
-            The name of the theme to load.
+            The registered name of the theme, including its prefix.
         app : App
             The instance of the Textual application.
         """
         # Remove CSS from previous theme
         self._remove_all_theme_css(app)
 
-        # Remove any prefixes
-        clean_name = theme_name
-        for prefix in [self._termz_theme_prefix, self._custom_theme_prefix]:
-            if clean_name.startswith(prefix):
-                clean_name = clean_name[len(prefix):]
-                break
+        theme_data = self._theme_data.get(theme_name)
+        css_files = theme_data.css_files if theme_data else None
+        if css_files:
+            self._read_css_files(css_files, app)
+        else:
+            _logger.debug("Theme %r has no stylesheet", theme_name)
 
-        # Load all CSS files that are in folder themes/{theme_name}/
-        theme_data = self._theme_data.get(clean_name)
-        if not theme_data or not theme_data.css_files:
-            logging.warning(f"No CSS files found for theme: {clean_name}")
-            return
+        self._apply_stylesheet(app)
 
-        for css_file in theme_data.css_files:
+    def _read_css_files(self, css_files: list[str], app: App[None]) -> None:
+        """Reads the given CSS files into the app's stylesheet."""
+        for css_file in css_files:
             try:
-                app.stylesheet.read(str(css_file))
-                logging.debug(f"Loaded CSS file: {css_file}")
+                app.stylesheet.read(css_file)
+                _logger.debug("Loaded CSS file: %r", css_file)
             except Exception as e:
-                logging.error(f"Error loading CSS file {css_file}: {e}")
+                _logger.error("Error loading CSS file %r: %s", css_file, e)
 
-        # Re-parse and apply to make sure changes take effect
+    def _apply_stylesheet(self, app: App[None]) -> None:
+        """Re-parses the stylesheet so that changes take effect."""
         app.stylesheet.reparse()
         try:
             app.stylesheet.update(app.screen)
         except Exception as e:
-            logging.error(f"Error updating stylesheet: {e}")
+            _logger.error("Error updating stylesheet: %s", e)
 
     def _remove_all_theme_css(self, app: App[None]) -> None:
         """
-        Remove all CSS files that were loaded from the /themes/ folder.
+        Remove all CSS files that were loaded from a theme folder.
 
         This is necessary when switching themes to avoid conflicts
         between styles from different themes.
+
+        The files this loader actually loaded are the yardstick, not a fixed
+        directory - otherwise the stylesheet of a consumer's own theme folder
+        would never be removed.
 
         Parameters
         ----------
         app : App
             The instance of the Textual application.
         """
-        themes_dir = STANDARD_THEMES_DIR.resolve()
-
-        logging.debug(f"Removing CSS files from themes directory: {themes_dir}")
+        theme_css_paths = {
+            Path(css_file).resolve()
+            for theme_data in self._theme_data.values()
+            for css_file in (theme_data.css_files or [])
+        }
 
         for key in list(app.stylesheet.source.keys()):
             path_str, _ = key
@@ -355,8 +394,8 @@ class ThemeLoader:
             except Exception:
                 continue
 
-            # Check if the CSS file is inside the themes directory
-            if themes_dir in css_path.parents:
+            if css_path in theme_css_paths:
+                _logger.debug("Removing CSS file: %r", path_str)
                 del app.stylesheet.source[key]
 
     def change_to_next_or_previous_theme(
@@ -364,6 +403,9 @@ class ThemeLoader:
     ) -> None:
         """
         Change to the next or previous theme in the list.
+
+        Cycling deliberately walks every theme the app knows, including
+        Textual's built-ins, which simply carry no termz stylesheet.
 
         Parameters
         ----------
@@ -376,4 +418,3 @@ class ThemeLoader:
         current_index = themes.index(app.theme)
         next_index = (current_index + direction) % len(themes)
         app.theme = themes[next_index]
-

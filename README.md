@@ -64,6 +64,8 @@ clear_lines(4)
 
 Dynamically loads and registers [Textual](https://github.com/Textualize/textual) themes from a folder. Each theme lives in its own sub-directory and must expose a `TEXTUAL_THEME` variable of type `textual.theme.Theme`. Optional `.css` / `.tcss` files in the same folder are loaded automatically when the theme is activated.
 
+A theme is identified by the `name` of its `TEXTUAL_THEME` plus the prefix it is registered under – the name of its directory carries no meaning and is free to differ. A theme without a stylesheet is equally valid; ten of the built-in themes below ship none. Each theme folder is read on its own, so an app can register several loaders and its own themes never collide with the ones the toolkit brings.
+
 termz ships 16 built-in themes:
 
 `classic-black-saturated`, `classic-black-v1`, `classic-black-v2`, `classic-blue`, `compact-gray`, `mnml-black`, `mnml-deepblack`, `pure-amber`, `pure-black`, `pure-blue`, `pure-green`, `pure-sweet16`, `xplore-black`, `xplore-blue`, `xplore-blue-muted`, `xplore-teal`

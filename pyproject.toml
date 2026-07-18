@@ -23,9 +23,45 @@ classifiers = [
     "Topic :: Terminals",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "basedpyright>=1.31",
+    "coverage>=7.13.4",
+    "pytest>=9.0",
+    "pytest-asyncio>=1.0",  # required to drive Textual apps via run_test()
+    "pytest-cov>=7.0",
+    "ruff>=0.15",
+]
+
 [project.urls]
 Homepage = "https://github.com/cgroening/py-termz"
 Repository = "https://github.com/cgroening/py-termz"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"  # TUI tests are async; no per-test marker needed
+xfail_strict = true    # an xfail that passes is a stale expectation
+# A warning is a defect that has not surfaced yet, so the suite fails on it.
+# Third-party deprecations get an explicit entry here rather than turning the
+# rule off, so that each exception stays visible and dated.
+filterwarnings = ["error"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--cov=termz",
+    "--cov-report=term-missing",
+]
+
+[tool.coverage.run]
+source = ["termz"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+# Holds the current level. Coverage that enforces nothing is decoration.
+# Raised with every module that gains tests (see TODO.md, section "Tests").
+fail_under = 39
 
 [tool.pyright]
 exclude = [
