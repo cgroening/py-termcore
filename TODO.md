@@ -60,10 +60,6 @@ Noticed while writing its tests, deliberately left alone to keep that change foc
 - [ ] `str_with_fixed_width` counts code points, not terminal cells. CJK text and emoji therefore render wider than the requested width, which defeats the purpose of the function. Fixing it properly needs an East-Asian-width table, and section 1.2.7 requires asking before adding a dependency.
 - [ ] Only `util/datetime.py` declares `__all__`, and only because its star-export shadowed the submodule itself. Every other module leaks its imports into the package namespace – `termz.io.database` exports `sqlite3`, `Enum` and `TracebackType`, for instance. Section 1.2.6 asks for a small public interface; this is the opposite.
 
-## Duplication with pylightlib
-
-- [ ] `termz/io/database.py` began as a copy of `pylightlib/pylightlib/io/Database.py` and the two have now diverged sharply: only the termz copy has parameterised queries, an identifier whitelist and tests. The predecessor still ships the version with every one of the defects listed in the changelog. Decide whether pylightlib should take this version over, or whether that module should be retired there.
-
 ## Release
 
 - [ ] Publish a version that contains `termz/util/version.py`. It is missing from the published 0.1.1 and exists only in the local development copy, which makes termplate's `termz>=0.1.1` constraint untrue: a fresh install fails at import time with `ModuleNotFoundError`. Until that release exists, termplate cannot be installed by anyone else.
@@ -107,5 +103,5 @@ A third group does not arise at all in a Textual application: the terminal guard
 
 ratada has each of these; termz has none of them.
 
-- [ ] `CLAUDE.md` with the project-specific conventions.
+- [x] `CLAUDE.md` with the project-specific conventions.
 - [ ] `docs/` holding `DEVELOPMENT.md` and a `CLEAN-UP.md` walkthrough checklist.
