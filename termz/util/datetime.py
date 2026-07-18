@@ -15,9 +15,31 @@ including:
 It supports both German-style date formatting ("DD.MM.YYYY") and English-style
 formatting ("YYYY-MM-DD") for flexibility in various locales.
 
+Every conversion is anchored in the machine's local time zone, and says so:
+the datetimes built here carry their offset instead of leaving it implied. A
+naive timestamp changes meaning with the daylight saving switch, with the
+machine and on serialisation, and the error surfaces months later in wrongly
+sorted or wrongly calculated data rather than at the call site.
+
 """
 
-from datetime import datetime, time
+from datetime import UTC, datetime, time
+
+# Without this, `from .datetime import *` in the package __init__ re-exports
+# the imported `datetime` class, which then shadows this very module: after
+# importing termz, `termz.util.datetime` is the class, not the module.
+__all__ = [
+    "DATE_FORMAT_ENGLISH",
+    "DATE_FORMAT_GERMAN",
+    "date_diff",
+    "date_to_timestamp",
+    "timestamp_to_date",
+    "today_date",
+    "today_timestamp",
+]
+
+DATE_FORMAT_GERMAN = "%d.%m.%Y"
+DATE_FORMAT_ENGLISH = "%Y-%m-%d"
 
 
 def timestamp_to_date(
@@ -37,22 +59,17 @@ def timestamp_to_date(
     Returns
     -------
     str
-        Date string in the format "DD.MM.YYYY" or "YYYY-MM-DD".
-        Empty string if the given timestamp is None.
+        Date string in the format "DD.MM.YYYY" or "YYYY-MM-DD", as seen in
+        the local time zone. Empty string if the given timestamp is None.
     """
     # Return empty string if the given timestamp is None
     if timestamp is None:
         return ""
 
-    # Convert timestamp to date
-    date_obj = datetime.fromtimestamp(timestamp)
+    # Convert timestamp to a date in the local zone
+    date_obj = datetime.fromtimestamp(timestamp, tz=UTC).astimezone()
 
-    if english_format:
-        format_str = "%Y-%m-%d"
-    else:
-        format_str = "%d.%m.%Y"
-
-    return date_obj.strftime(format_str)
+    return date_obj.strftime(_date_format(english_format))
 
 
 def date_to_timestamp(date_str: str, english_format: bool = False) \
@@ -60,6 +77,8 @@ def date_to_timestamp(date_str: str, english_format: bool = False) \
     """
     Converts a date in the format "DD.MM.YYYY" or "YYYY-MM-DD" into
     a UNIX timestamp.
+
+    The date is read as local midnight.
 
     Parameters
     ----------
@@ -72,19 +91,18 @@ def date_to_timestamp(date_str: str, english_format: bool = False) \
     Returns
     -------
     int or None
-        Unix timestamp (number of seconds since 1970-01-01).
+        Unix timestamp (number of seconds since 1970-01-01), or None if the
+        string does not match the expected format.
     """
-    if english_format:
-        format_str = "%Y-%m-%d"
-    else:
-        format_str = "%d.%m.%Y"
-
     # Check if the date string matches the expected format
     try:
-        date_obj = datetime.strptime(date_str, format_str)
-        return int(date_obj.timestamp())
+        date_obj = datetime.strptime(date_str, _date_format(english_format))
     except ValueError:
         return None
+
+    # astimezone() reads a naive value as local time and attaches the matching
+    # offset - the assumption this module makes explicit rather than inherits
+    return int(date_obj.astimezone().timestamp())
 
 
 def date_diff(timestamp1: int, timestamp2: int) -> int:
@@ -117,13 +135,13 @@ def today_timestamp() -> int:
     Returns
     -------
     int
-        UNIX timestamp.
+        UNIX timestamp of local midnight.
     """
-    # Date of today
-    today = datetime.today().date()
+    # Date of today in the local zone
+    today = datetime.now(UTC).astimezone().date()
 
-    # Combine with time 00:00
-    midnight = datetime.combine(today, time.min)
+    # Combine with time 00:00 and anchor it in the local zone
+    midnight = datetime.combine(today, time.min).astimezone()
 
     # Return unix timestamp
     return int(midnight.timestamp())
@@ -142,11 +160,14 @@ def today_date(english_format: bool = False) -> str:
     Returns
     -------
     str
-        Date string in the format "DD.MM.YYYY" or "YYYY-MM-DD".
-        Empty string if the given timestamp is None.
+        Today's date in the format "DD.MM.YYYY" or "YYYY-MM-DD".
     """
     today = today_timestamp()
     today_str = timestamp_to_date(today, english_format)
 
     return today_str
 
+
+def _date_format(english_format: bool) -> str:
+    """Returns the strftime format for the requested locale style."""
+    return DATE_FORMAT_ENGLISH if english_format else DATE_FORMAT_GERMAN

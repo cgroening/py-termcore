@@ -1,7 +1,16 @@
+"""
+termz.util.index
+================
+
+Index arithmetic for navigating lists, in particular the cyclic movement
+selection lists in a terminal user interface are expected to have.
+
+"""
+
 
 def next_index(
     current_index: int,
-    max_index: int,
+    length: int,
     direction: int = 1,
     loop_behavior: bool = True
 ) -> int:
@@ -13,11 +22,11 @@ def next_index(
     ----------
     current_index : int
         The current index in the list.
-    max_index : int
-        The length of the list.
+    length : int
+        The number of items in the list.
     direction : int, optional
-        The direction of movement
-        (1 for forward, -1 for backward).
+        The direction and size of the movement (1 for one step forward,
+        -1 for one step backward).
     loop_behavior : bool, optional
         If True, the index will wrap around when reaching
         the start or end of the list. If False, the index will be
@@ -26,7 +35,7 @@ def next_index(
     Returns
     -------
     int
-        The calculated next index.
+        The calculated next index. An empty list always yields 0.
 
     Notes
     -----
@@ -44,19 +53,32 @@ def next_index(
     --------
     For a list of length 5 (indices 0 to 4):
 
-    >>> (4 + 1) % 5  # moves from the end to the start
+    >>> next_index(4, 5)  # moves from the end to the start
     0
-    >>> (0 - 1) % 5  # moves from the start to the end
+    >>> next_index(0, 5, direction=-1)  # moves from the start to the end
     4
-    >>> (2 + 1) % 5  # normal forward movement
+    >>> next_index(2, 5)  # normal forward movement
     3
-    >>> (2 - 1) % 5  # normal backward movement
+    >>> next_index(2, 5, direction=-1)  # normal backward movement
     1
-    """
-    if loop_behavior:
-        return (current_index + direction) % max_index
 
-    if direction < 0:
-        return max(current_index - 1, 0)
-    else:
-        return min(current_index + 1, max_index - 1)
+    Without wrapping the index stops at the bounds:
+
+    >>> next_index(4, 5, loop_behavior=False)
+    4
+    >>> next_index(0, 5, direction=-1, loop_behavior=False)
+    0
+
+    An empty list has no valid index, so 0 is returned:
+
+    >>> next_index(0, 0)
+    0
+    """
+    # An empty list has no index to move to - and % 0 would raise
+    if length <= 0:
+        return 0
+
+    if loop_behavior:
+        return (current_index + direction) % length
+
+    return max(0, min(current_index + direction, length - 1))
