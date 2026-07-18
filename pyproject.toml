@@ -85,10 +85,15 @@ select = [
     "PL",    # pylint
     "RUF",   # ruff-specific rules
 ]
+# The numpy convention disables D212 and D213 alike, which silently permits
+# both layouts. D213 has to be re-enabled explicitly to enforce the one the
+# style guide mandates: summary on the line after the opening quotes.
+extend-select = ["D213"]
+
 ignore = [
     "D107",    # __init__ is documented in the class docstring
     "D203",    # conflicts with D211 (no blank line before class docstring)
-    "D213",    # conflicts with D212 (summary on the first line)
+    "D212",    # conflicts with D213 (summary on the line after the quotes)
     "D401",    # summaries use 3rd person ("Prints..."), not the imperative
     # TRY003 bans descriptive messages at the raise site, which works against
     # the rule that exceptions must carry context (what, where, why).
