@@ -34,7 +34,7 @@ How to run it:
 
 ## Phase 1, the console output module
 
-`cli/output.py`, the module that owns every visible byte termz produces, and it has no tests at all.
+`cli/output.py`, the module that owns every visible byte termcore produces, and it has no tests at all.
 
 - [ ] Read it. Nine public functions, all of them wrappers around Rich.
 - [ ] `console` is a module-level public name; decide whether it belongs in `__all__` or whether `get_console` is the whole contract.

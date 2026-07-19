@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).parent.parent
-PACKAGE_ROOT = REPO_ROOT / "termz"
+PACKAGE_ROOT = REPO_ROOT / "termcore"
 
 # The documents that name paths as instructions rather than as prose.
 INSTRUCTION_DOCS = (
@@ -40,7 +40,7 @@ ALLOWED_MISSING = frozenset(
         "dist/",
         "dist/*.whl",
         # The throwaway environment the release instructions create.
-        f"{tempfile.gettempdir()}/termz-check",
+        f"{tempfile.gettempdir()}/termcore-check",
     }
 )
 

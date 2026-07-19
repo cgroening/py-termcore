@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from termz.util.datetime import (
+from termcore.util.datetime import (
     DateFormat,
     date_diff,
     date_to_timestamp,

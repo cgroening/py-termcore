@@ -3,8 +3,8 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "termz"
-version = "0.1.1"
+name = "termcore"
+version = "0.1.2"
 description = "Terminal utilities for CLI, TUI, IO and general use"
 readme = "README.md"
 license = { text = "MIT" }
@@ -34,8 +34,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/cgroening/py-termz"
-Repository = "https://github.com/cgroening/py-termz"
+Homepage = "https://github.com/cgroening/py-termcore"
+Repository = "https://github.com/cgroening/py-termcore"
 
 [tool.ruff]
 line-length = 80
@@ -74,7 +74,7 @@ select = [
     "RSE",   # flake8-raise
     "SIM",   # flake8-simplify
     "SLF",   # flake8-self (no private member access across objects)
-    "T20",   # flake8-print (visible output goes through termz.cli.output)
+    "T20",   # flake8-print (visible output goes through termcore.cli.output)
     "TC",    # flake8-type-checking
     "TRY",   # tryceratops
     "PTH",   # flake8-use-pathlib
@@ -120,13 +120,13 @@ max-args = 3  # style guide: keep parameter count at 3 or below
 "__init__.py" = ["F401", "F403"]  # re-export the public package API
 # Theme folders are loaded by path through ThemeLoader, never imported, and
 # their directory names are not valid identifiers.
-"termz/tui/themes/*/theme.py" = ["INP001", "D100"]
-# termz.cli.output is the module that owns visible console output; a print
+"termcore/tui/themes/*/theme.py" = ["INP001", "D100"]
+# termcore.cli.output is the module that owns visible console output; a print
 # here is the product, not a stray debug statement.
-"termz/cli/output.py" = ["T201"]
+"termcore/cli/output.py" = ["T201"]
 # Textual reads annotations at runtime, so a type-only import moved into
 # a TYPE_CHECKING block stops resolving (style guide 3.2.9).
-"termz/tui/**" = ["TC002", "TC003"]
+"termcore/tui/**" = ["TC002", "TC003"]
 "tests/**" = [
     "S101",    # assert is the point of a test
     "D",       # no docstrings required in tests
@@ -150,12 +150,12 @@ filterwarnings = ["error"]
 addopts = [
     "--strict-markers",
     "--strict-config",
-    "--cov=termz",
+    "--cov=termcore",
     "--cov-report=term-missing",
 ]
 
 [tool.coverage.run]
-source = ["termz"]
+source = ["termcore"]
 branch = true
 
 [tool.coverage.report]

@@ -14,9 +14,9 @@ import pytest
 from textual.app import App
 from textual.theme import BUILTIN_THEMES
 
-from termz.tui.theme_loader import (
+from termcore.tui.theme_loader import (
     DEFAULT_CUSTOM_THEME_PREFIX,
-    DEFAULT_TERMZ_THEME_PREFIX,
+    DEFAULT_TERMCORE_THEME_PREFIX,
     STANDARD_THEMES_DIR,
     ThemeLoader,
 )
@@ -27,7 +27,7 @@ OTHER_CSS = "Screen { background: #202020; }"
 
 
 def bundled_theme_folders() -> list[Path]:
-    """Returns the theme folders that ship with termz."""
+    """Returns the theme folders that ship with termcore."""
     return [
         folder for folder in STANDARD_THEMES_DIR.iterdir()
         if folder.is_dir() and not folder.name.startswith(("_", "."))
@@ -54,7 +54,7 @@ def loaded_css_paths(app: App[None]) -> set[Path]:
 
 
 def custom_loader(theme_root: Path) -> ThemeLoader:
-    """Returns a loader for a custom theme folder, without termz's own."""
+    """Returns a loader for a custom theme folder, without termcore's own."""
     return ThemeLoader.custom_only(str(theme_root))
 
 
@@ -101,7 +101,7 @@ class TestThemeRegistryIsPerInstance:
     def test_a_second_loader_still_finds_the_bundled_themes(
         self, theme_root: Path, make_theme: MakeTheme
     ) -> None:
-        # A consumer's theme folder used to shadow termz's own on every
+        # A consumer's theme folder used to shadow termcore's own on every
         # loader after the first, because both were imported as a package
         # named after the folder. The shared registry hid it: the second
         # loader still saw the first one's themes.
@@ -214,7 +214,7 @@ class TestThemeIdentityIsTheDeclaredName:
         loader = ThemeLoader(theme_folder=str(theme_root))
         names = names_in_app(loader)
 
-        assert f"{DEFAULT_TERMZ_THEME_PREFIX}{bundled}" in names
+        assert f"{DEFAULT_TERMCORE_THEME_PREFIX}{bundled}" in names
         assert f"{DEFAULT_CUSTOM_THEME_PREFIX}{bundled}" in names
 
     def test_a_duplicate_declared_name_is_refused(
@@ -237,11 +237,11 @@ class TestThemeDiscovery:
 
         assert len(names_in_app(loader)) == len(bundled_theme_folders())
 
-    def test_bundled_themes_carry_the_termz_prefix(self) -> None:
+    def test_bundled_themes_carry_the_termcore_prefix(self) -> None:
         loader = ThemeLoader()
 
         assert all(
-            name.startswith(DEFAULT_TERMZ_THEME_PREFIX)
+            name.startswith(DEFAULT_TERMCORE_THEME_PREFIX)
             for name in names_in_app(loader)
         )
 
@@ -334,7 +334,7 @@ class TestRegistrationOrder:
         loader = ThemeLoader(theme_folder=str(theme_root))
         names = names_in_app(loader)
 
-        assert names[0].startswith(DEFAULT_TERMZ_THEME_PREFIX)
+        assert names[0].startswith(DEFAULT_TERMCORE_THEME_PREFIX)
         assert names[-1].startswith(DEFAULT_CUSTOM_THEME_PREFIX)
 
     def test_themes_are_alphabetical_within_their_group(
@@ -367,7 +367,7 @@ class TestStylesheetLoading:
     async def test_switching_themes_removes_the_previous_stylesheet(
         self, theme_root: Path, make_theme: MakeTheme
     ) -> None:
-        # A consumer's themes live outside termz's own folder, which is
+        # A consumer's themes live outside termcore's own folder, which is
         # exactly the case the removal used to miss.
         solar = make_theme(theme_root, "solar", css=CSS)
         lunar = make_theme(theme_root, "lunar", css=OTHER_CSS)
@@ -617,7 +617,7 @@ class TestThemeCycling:
         self, theme_root: Path, make_theme: MakeTheme
     ) -> None:
         # A deliberate decision: they render correctly, they just carry no
-        # termz stylesheet.
+        # termcore stylesheet.
         make_theme(theme_root, "solar")
         loader = custom_loader(theme_root)
         app: App[None] = App()
@@ -643,4 +643,4 @@ class TestDiagnosticsAreFilterable:
             custom_loader(theme_root)
 
         assert [record.name for record in caplog.records] \
-            == ["termz.tui.theme_loader"]
+            == ["termcore.tui.theme_loader"]

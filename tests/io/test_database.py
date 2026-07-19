@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from termz.io.database import (
+from termcore.io.database import (
     ColumnOrder,
     Condition,
     Database,
@@ -20,7 +20,7 @@ from termz.io.database import (
     SQLComparisonOperator,
     SQLOrderByDirection,
 )
-from termz.io.errors import EmptyConditionsError, UnknownIdentifierError
+from termcore.io.errors import EmptyConditionsError, UnknownIdentifierError
 
 ASC = SQLOrderByDirection.ASC
 DESC = SQLOrderByDirection.DESC
@@ -535,7 +535,7 @@ class TestQuery:
     ) -> None:
         db.debug_mode = True
 
-        with caplog.at_level("DEBUG", logger="termz.io.database"):
+        with caplog.at_level("DEBUG", logger="termcore.io.database"):
             db.fetch("tasks")
 
         assert "SELECT" in caplog.text
@@ -543,7 +543,7 @@ class TestQuery:
     def test_stays_quiet_otherwise(
         self, db: Database, caplog: pytest.LogCaptureFixture
     ) -> None:
-        with caplog.at_level("DEBUG", logger="termz.io.database"):
+        with caplog.at_level("DEBUG", logger="termcore.io.database"):
             db.fetch("tasks")
 
         assert caplog.text == ""

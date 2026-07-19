@@ -1,16 +1,16 @@
-"""Guards the size and shape of what `from termz import *` hands out.
+"""Guards the size and shape of what `from termcore import *` hands out.
 
 Every module re-exports through `import *`, so a module without an `__all__`
 re-exports its own imports too. That is not theoretical: `util/datetime.py`
 once re-exported the `datetime` class over the submodule of the same name,
-and `import termz.util.datetime` handed back the class.
+and `import termcore.util.datetime` handed back the class.
 """
 
 import importlib
 import pkgutil
 
-import termz
-import termz.util.datetime
+import termcore
+import termcore.util.datetime
 
 # Names a module imported for its own use and must not pass on.
 BORROWED = {
@@ -27,13 +27,13 @@ def public_names(module: object) -> set[str]:
 
 class TestTheStarExportCarriesOnlyTheApi:
     def test_no_borrowed_name_is_re_exported(self) -> None:
-        assert not public_names(termz) & BORROWED
+        assert not public_names(termcore) & BORROWED
 
     def test_the_surface_stays_small(self) -> None:
         # Not a magic number to keep in step: a sharp rise means a module
         # gained an import and lost its `__all__`, which is the defect this
         # file exists for.
-        assert len(public_names(termz)) < 100
+        assert len(public_names(termcore)) < 100
 
     def test_the_documented_entry_points_are_reachable(self) -> None:
         for name in (
@@ -43,7 +43,7 @@ class TestTheStarExportCarriesOnlyTheApi:
             "next_index", "clamped_index", "cell_width",
             "str_with_fixed_width", "DateFormat", "print_error",
         ):
-            assert hasattr(termz, name), name
+            assert hasattr(termcore, name), name
 
 
 class TestEveryModuleDeclaresItsApi:
@@ -51,7 +51,7 @@ class TestEveryModuleDeclaresItsApi:
         # A module without one silently widens the package's public surface.
         missing: list[str] = []
         for info in pkgutil.walk_packages(
-            termz.__path__, prefix="termz."
+            termcore.__path__, prefix="termcore."
         ):
             if ".themes." in info.name:
                 continue
@@ -63,4 +63,4 @@ class TestEveryModuleDeclaresItsApi:
 
     def test_the_datetime_submodule_is_not_shadowed(self) -> None:
         # The regression this file was written for.
-        assert termz.util.datetime.__name__ == "termz.util.datetime"
+        assert termcore.util.datetime.__name__ == "termcore.util.datetime"

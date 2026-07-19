@@ -21,8 +21,8 @@ import json
 from pathlib import Path
 from typing import cast
 
-from termz.io.errors import StateFileError
-from termz.util.singleton import Singleton
+from termcore.io.errors import StateFileError
+from termcore.util.singleton import Singleton
 
 __all__ = [
     "AppStateStorage",

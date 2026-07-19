@@ -1,4 +1,4 @@
-"""Domain exceptions raised by the `termz.io` modules."""
+"""Domain exceptions raised by the `termcore.io` modules."""
 
 __all__ = [
     "AppStateError",

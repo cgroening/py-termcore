@@ -12,7 +12,7 @@ from collections.abc import Sequence
 import pytest
 from textual.binding import Binding
 
-from termz.tui.custom_bindings import CustomBindings
+from termcore.tui.custom_bindings import CustomBindings
 from tests.tui.conftest import WriteBindings
 
 BINDINGS = """

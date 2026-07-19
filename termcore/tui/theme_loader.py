@@ -13,14 +13,14 @@ from textual.theme import Theme
 
 __all__ = [
     "DEFAULT_CUSTOM_THEME_PREFIX",
-    "DEFAULT_TERMZ_THEME_PREFIX",
+    "DEFAULT_TERMCORE_THEME_PREFIX",
     "SCRIPT_DIR",
     "STANDARD_THEMES_DIR",
     "ThemeData",
     "ThemeLoader",
 ]
 
-DEFAULT_TERMZ_THEME_PREFIX = "TERMZ_"
+DEFAULT_TERMCORE_THEME_PREFIX = "TERMCORE_"
 DEFAULT_CUSTOM_THEME_PREFIX = "CUSTOM_"
 SCRIPT_DIR = Path(__file__).parent.parent
 STANDARD_THEMES_DIR = SCRIPT_DIR / "tui/themes"
@@ -55,7 +55,7 @@ class ThemeLoader:
     """
 
     _theme_folder: str | None
-    _termz_theme_prefix: str
+    _termcore_theme_prefix: str
     _custom_theme_prefix: str
     _theme_names: list[str]
     _theme_data: dict[str, ThemeData]
@@ -63,16 +63,18 @@ class ThemeLoader:
 
     def __init__(
         self, theme_folder: str | None = None,
-        termz_theme_prefix: str = DEFAULT_TERMZ_THEME_PREFIX,
+        termcore_theme_prefix: str = DEFAULT_TERMCORE_THEME_PREFIX,
         custom_theme_prefix: str = DEFAULT_CUSTOM_THEME_PREFIX
     ) -> None:
         """
-        Loads the themes that ship with termz, plus the given folder.
+        Loads the themes that ship with termcore, plus the given folder.
 
         Use `ThemeLoader.custom_only` for a loader that leaves the bundled
         themes out.
         """
-        self._configure(theme_folder, termz_theme_prefix, custom_theme_prefix)
+        self._configure(
+            theme_folder, termcore_theme_prefix, custom_theme_prefix
+        )
         self._load_standard_themes()
         self._load_custom_themes()
         self._theme_names.sort()
@@ -80,17 +82,17 @@ class ThemeLoader:
     @classmethod
     def custom_only(
         cls, theme_folder: str,
-        termz_theme_prefix: str = DEFAULT_TERMZ_THEME_PREFIX,
+        termcore_theme_prefix: str = DEFAULT_TERMCORE_THEME_PREFIX,
         custom_theme_prefix: str = DEFAULT_CUSTOM_THEME_PREFIX
     ) -> "ThemeLoader":
         """
-        Returns a loader for the given folder alone, without termz's themes.
+        Returns a loader for the given folder alone, without termcore's themes.
 
         Parameters
         ----------
         theme_folder : str
             Path to the folder holding the theme directories.
-        termz_theme_prefix : str, optional
+        termcore_theme_prefix : str, optional
             Kept so that a later comparison against a bundled theme name
             still resolves, even though none are loaded.
         custom_theme_prefix : str, optional
@@ -105,7 +107,7 @@ class ThemeLoader:
         # apart from reaching into a foreign object.
         loader = cls.__new__(cls)
         loader._configure(  # noqa: SLF001
-            theme_folder, termz_theme_prefix, custom_theme_prefix
+            theme_folder, termcore_theme_prefix, custom_theme_prefix
         )
         loader._load_custom_themes()  # noqa: SLF001
         loader._theme_names.sort()  # noqa: SLF001
@@ -114,20 +116,20 @@ class ThemeLoader:
 
     def _configure(
         self, theme_folder: str | None,
-        termz_theme_prefix: str,
+        termcore_theme_prefix: str,
         custom_theme_prefix: str
     ) -> None:
         """Stores the settings and starts from an empty registry."""
         self._theme_folder = theme_folder
-        self._termz_theme_prefix = termz_theme_prefix
+        self._termcore_theme_prefix = termcore_theme_prefix
         self._custom_theme_prefix = custom_theme_prefix
         self._theme_names = []
         self._theme_data = {}
 
     def _load_standard_themes(self) -> None:
-        """Loads and registers the themes that ship with termz."""
+        """Loads and registers the themes that ship with termcore."""
         self._load_folder(
-            self._termz_theme_prefix, STANDARD_THEMES_DIR.resolve()
+            self._termcore_theme_prefix, STANDARD_THEMES_DIR.resolve()
         )
 
     def _load_custom_themes(self) -> None:
@@ -211,7 +213,7 @@ class ThemeLoader:
         name, so a second application lost the themes of the toolkit.
         """
         spec = importlib.util.spec_from_file_location(
-            f"_termz_theme_{theme_file.parent.name}", theme_file
+            f"_termcore_theme_{theme_file.parent.name}", theme_file
         )
         if spec is None or spec.loader is None:
             raise ImportError(f"Cannot load a theme module from {theme_file}")
@@ -311,7 +313,7 @@ class ThemeLoader:
         app : App
             The instance of the Textual application.
         """
-        # Sort themes, first TERMZ_THEME_PREFIX, then CUSTOM_THEME_PREFIX
+        # Sort themes, first TERMCORE_THEME_PREFIX, then CUSTOM_THEME_PREFIX
         self._theme_names.sort(key=self._registration_order)
 
         # Loop through name list instead of dict to keep alphabetic order
@@ -319,9 +321,9 @@ class ThemeLoader:
             app.register_theme(self._theme_data[theme_name].textual_theme)
 
     def _registration_order(self, theme_name: str) -> tuple[int, str]:
-        """Sorts termz themes before custom ones, alphabetically within each."""
+        """Sorts termcore themes before custom ones, then alphabetically."""
         is_custom = \
-            self._theme_data[theme_name].prefix != self._termz_theme_prefix
+            self._theme_data[theme_name].prefix != self._termcore_theme_prefix
         return int(is_custom), theme_name
 
     def set_previous_theme_in_textual_app(
@@ -478,7 +480,7 @@ class ThemeLoader:
         Change to the next or previous theme in the list.
 
         Cycling deliberately walks every theme the app knows, including
-        Textual's built-ins, which simply carry no termz stylesheet.
+        Textual's built-ins, which simply carry no termcore stylesheet.
 
         Parameters
         ----------

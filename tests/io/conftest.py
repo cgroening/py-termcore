@@ -2,7 +2,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from termz.io.database import Database
+from termcore.io.database import Database
 
 SCHEMA = (
     "CREATE TABLE tasks ("

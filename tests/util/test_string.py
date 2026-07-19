@@ -11,7 +11,7 @@ points is what pushed such a column out of alignment.
 
 import pytest
 
-from termz.util.string import (
+from termcore.util.string import (
     ALIGN_CENTER,
     ALIGN_LEFT,
     ALIGN_RIGHT,

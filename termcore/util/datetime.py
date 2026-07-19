@@ -25,7 +25,7 @@ from enum import Enum
 
 # Without this, `from .datetime import *` in the package __init__ re-exports
 # the imported `datetime` class, which then shadows this very module: after
-# importing termz, `termz.util.datetime` is the class, not the module.
+# importing termcore, `termcore.util.datetime` is the class, not the module.
 __all__ = [
     "DateFormat",
     "date_diff",

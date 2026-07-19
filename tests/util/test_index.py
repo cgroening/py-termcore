@@ -1,6 +1,6 @@
 """Tests for the index arithmetic behind cyclic list navigation."""
 
-from termz.util.index import clamped_index, next_index
+from termcore.util.index import clamped_index, next_index
 
 
 class TestCyclicMovement:

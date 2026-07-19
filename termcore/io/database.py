@@ -41,7 +41,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, cast
 
-from termz.io.errors import EmptyConditionsError, UnknownIdentifierError
+from termcore.io.errors import EmptyConditionsError, UnknownIdentifierError
 
 __all__ = [
     "VALUELESS_OPERATORS",

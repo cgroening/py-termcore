@@ -1,8 +1,8 @@
 # TODO
 
-Deferred work for termz, collected from two sources: the bugs that surfaced while hardening `termplate` against the style guide, and a feature comparison with `ratada`, the Rust toolkit that plays the same role for `clibase`.
+Deferred work for termcore, collected from two sources: the bugs that surfaced while hardening `termplate` against the style guide, and a feature comparison with `ratada`, the Rust toolkit that plays the same role for `clibase`.
 
-termz is the foundation under termplate. That ordering matters for how this list is sorted: a defect here reaches every application built on the toolkit, and it reaches them silently, because the applications trust the library rather than testing it.
+termcore is the foundation under termplate. That ordering matters for how this list is sorted: a defect here reaches every application built on the toolkit, and it reaches them silently, because the applications trust the library rather than testing it.
 
 ## Tests
 
@@ -10,20 +10,20 @@ Every module named below is covered now, and the suite has grown from nothing to
 
 Writing these suites produced the same result every time: each module had to be fixed before it could be meaningfully tested. That pattern is the argument for the remaining entries, not against them.
 
-The practical consequence was already documented before the first test existed: of the four theme bugs that held up termplate, three lived in `termz/tui/theme_loader.py`, and each of them would have been caught by one test. Writing that suite immediately surfaced a fifth and a sixth defect that nobody had noticed.
+The practical consequence was already documented before the first test existed: of the four theme bugs that held up termplate, three lived in `termcore/tui/theme_loader.py`, and each of them would have been caught by one test. Writing that suite immediately surfaced a fifth and a sixth defect that nobody had noticed.
 
 Ordered by how much a test would buy:
 
-- [x] `termz/tui/theme_loader.py` – the module with the most silent behaviour and all four known bugs: theme discovery, name prefixing, CSS resolution, persistence and cycling. Nothing here fails loudly when it goes wrong; it just renders the wrong colours.
-- [x] `termz/tui/custom_bindings.py` – the group and prefix contract (`_global`, `<name>_tab`, `<name>_screen`) that every derived app depends on and that no consumer can verify from the outside.
-- [x] `termz/io/database.py` – it assembles SQL strings. That is pure, side-effect-light logic and therefore the cheapest meaningful coverage in the repository.
-- [x] `termz/util/datetime.py`, `termz/util/index.py`, `termz/util/string.py` – pure functions with obvious edge cases (empty input, boundaries, wrapping).
+- [x] `termcore/tui/theme_loader.py` – the module with the most silent behaviour and all four known bugs: theme discovery, name prefixing, CSS resolution, persistence and cycling. Nothing here fails loudly when it goes wrong; it just renders the wrong colours.
+- [x] `termcore/tui/custom_bindings.py` – the group and prefix contract (`_global`, `<name>_tab`, `<name>_screen`) that every derived app depends on and that no consumer can verify from the outside.
+- [x] `termcore/io/database.py` – it assembles SQL strings. That is pure, side-effect-light logic and therefore the cheapest meaningful coverage in the repository.
+- [x] `termcore/util/datetime.py`, `termcore/util/index.py`, `termcore/util/string.py` – pure functions with obvious edge cases (empty input, boundaries, wrapping).
 
 ## Tooling
 
 - [x] There is no `[tool.ruff]` section in `pyproject.toml`, so ruff runs on its defaults: no line length, no rule selection. Adopt the baseline from section 3.2.1 of the style guide, the one termplate already runs green. Done: the rule set reported 531 violations on adoption and `ruff check .` is green now. The formatter is deliberately left unconfigured - it would have rewritten 41 of 55 files for no behavioural gain, and `E501` enforces the column limit.
 - [x] `[tool.pyright]` sets six blanket suppressions and no `typeCheckingMode` at all, so the library is not even checked in strict mode. The guide requires strict. Set it, then review each suppression individually and leave a comment on every one that stays. Done, with a correction to the premise: basedpyright's own default is `recommended`, which is stricter than `strict`, so the library was already being checked more strictly than the guide asks. Setting `strict` states the contract and is what a consumer running plain pyright needs. Two suppressions were deleted after measuring that they report nothing in either mode; the four that stayed carry a comment each.
-- [x] `py.typed` is missing. Without that marker a consumer's type checker treats the whole package as untyped and silently degrades every import to `Any` – including termplate, which otherwise runs strict basedpyright. Add the file and ship it via `package-data`. Done; no `package-data` entry was needed, since hatchling ships everything inside the package directory. Verified in the built wheel. The marker immediately earned itself: with termz typed, termplate's checker found that `Singleton` reported `object` for every instance it built.
+- [x] `py.typed` is missing. Without that marker a consumer's type checker treats the whole package as untyped and silently degrades every import to `Any` – including termplate, which otherwise runs strict basedpyright. Add the file and ship it via `package-data`. Done; no `package-data` entry was needed, since hatchling ships everything inside the package directory. Verified in the built wheel. The marker immediately earned itself: with termcore typed, termplate's checker found that `Singleton` reported `object` for every instance it built.
 
 ## Bugs found while hardening termplate
 
@@ -32,9 +32,9 @@ All four were diagnosed from termplate but had to be fixed here. All four are do
 - [x] `ThemeLoader._theme_names` and `_theme_data` are class attributes with mutable defaults that `__init__` never resets, and `register_themes_in_textual_app` re-prefixes the same `Theme` objects on every call. A second app instance in one process therefore sees `CUSTOM_CUSTOM_classic-black`, a third `CUSTOM_CUSTOM_CUSTOM_...`. Production gets away with it because there is one app per process; a test suite that builds an app per test does not. termplate carries a `reset_theme_loader` fixture purely to work around this, and it can be deleted once the state is per instance. Fixed: state is per instance, and the prefix is applied once at load time to a copy of the theme, so registration mutates nothing. The fixture in termplate is gone.
 - [x] The coupling "a theme directory's name must equal the `name` in its `theme.py`" is undocumented and unenforced, because themes are stored under the directory name but their CSS is resolved by the theme name. Breaking it registers the theme and silently drops its stylesheet – the failure termplate shipped with. Either key both lookups the same way or refuse a mismatch loudly. Fixed: both are keyed by the registered name, so the coupling no longer exists rather than being enforced. A duplicate name within one prefix is refused with an error.
 - [x] `ThemeLoader` logs through the root logger (`logging.warning(...)`) instead of `logging.getLogger(__name__)`, so its diagnostics cannot be filtered per module and surface as `WARNING:root:` in every consumer. Fixed, and the same lines moved to lazy `%`-formatting with `%r`.
-- [x] Cycling themes also walks Textual's built-in themes, which have no termz stylesheet, so each one logs "No CSS files found for theme: textual-dark". The theme renders correctly, so this is noise rather than breakage – but a warning that fires during normal use trains people to ignore warnings. Either restrict cycling to registered themes or lower the level for the built-ins. Fixed by lowering the level: the built-ins were only half the noise, since ten of the sixteen bundled themes ship no stylesheet either and warned just as loudly. Cycling deliberately still reaches the built-ins.
-- [x] From the second `ThemeLoader` in a process on, the bundled themes were not found at all. `_load_themes` only inserted a theme folder's parent into `sys.path` if it was absent, so on the second load termz's own folder sat behind the consumer's, and the package `themes` resolved to the wrong one – every bundled folder reported "no theme.py". The shared class-level registry hid this completely, because the second loader still saw the first one's themes. Fixed by importing each `theme.py` by file path via `importlib.util`, which removes the `sys.path` and `sys.modules` handling entirely.
-- [x] `_remove_all_theme_css` compared against termz's own theme directory, so the stylesheet of a consumer's theme was never removed on a switch and stayed applied on top of every theme afterwards. Fixed by removing exactly the files the loader read. The re-parse now also runs when the new theme has no stylesheet, which previously left the removal unapplied.
+- [x] Cycling themes also walks Textual's built-in themes, which have no termcore stylesheet, so each one logs "No CSS files found for theme: textual-dark". The theme renders correctly, so this is noise rather than breakage – but a warning that fires during normal use trains people to ignore warnings. Either restrict cycling to registered themes or lower the level for the built-ins. Fixed by lowering the level: the built-ins were only half the noise, since ten of the sixteen bundled themes ship no stylesheet either and warned just as loudly. Cycling deliberately still reaches the built-ins.
+- [x] From the second `ThemeLoader` in a process on, the bundled themes were not found at all. `_load_themes` only inserted a theme folder's parent into `sys.path` if it was absent, so on the second load termcore's own folder sat behind the consumer's, and the package `themes` resolved to the wrong one – every bundled folder reported "no theme.py". The shared class-level registry hid this completely, because the second loader still saw the first one's themes. Fixed by importing each `theme.py` by file path via `importlib.util`, which removes the `sys.path` and `sys.modules` handling entirely.
+- [x] `_remove_all_theme_css` compared against termcore's own theme directory, so the stylesheet of a consumer's theme was never removed on a switch and stayed applied on top of every theme afterwards. Fixed by removing exactly the files the loader read. The re-parse now also runs when the new theme has no stylesheet, which previously left the removal unapplied.
 
 ## Further findings in ThemeLoader
 
@@ -58,11 +58,11 @@ Noticed while writing its tests, deliberately left alone to keep that change foc
 
 - [x] `date_diff` divides by 86400, so a difference of one second in the wrong direction reports -1 days, and any span crossing a daylight saving switch is off by one. Deciding between "whole 24-hour periods" and "calendar days apart" is a semantic choice, not a bug fix.
 - [x] `str_with_fixed_width` counts code points, not terminal cells. CJK text and emoji therefore render wider than the requested width, which defeats the purpose of the function. Fixing it properly needs an East-Asian-width table, and section 1.2.7 requires asking before adding a dependency. Corrected: Python ships that table, so no dependency was needed. `cell_width` in `util/string.py` counts cells with `unicodedata`, and `str_with_fixed_width` is built on it.
-- [x] Only `util/datetime.py` declares `__all__`, and only because its star-export shadowed the submodule itself. Every other module leaks its imports into the package namespace – `termz.io.database` exports `sqlite3`, `Enum` and `TracebackType`, for instance. Section 1.2.6 asks for a small public interface; this is the opposite.
+- [x] Only `util/datetime.py` declares `__all__`, and only because its star-export shadowed the submodule itself. Every other module leaks its imports into the package namespace – `termcore.io.database` exports `sqlite3`, `Enum` and `TracebackType`, for instance. Section 1.2.6 asks for a small public interface; this is the opposite.
 
 ## Release
 
-- [ ] Publish a version that contains `termz/util/version.py`. It is missing from the published 0.1.1 and exists only in the local development copy, which makes termplate's `termz>=0.1.1` constraint untrue: a fresh install fails at import time with `ModuleNotFoundError`. Until that release exists, termplate cannot be installed by anyone else.
+- [ ] Publish 0.1.2, the first release under the name `termcore`. It is prepared but not uploaded. Everything termplate needs exists only in this working copy: `util/version.py`, the named replacements for the three flag arguments, and the `TERMCORE_` theme prefix. Until the upload happens, termplate's `termcore>=0.1.2` constraint resolves to nothing and the app cannot be installed by anyone else. The old `termz` releases stay on PyPI untouched – not yanked, just no longer maintained.
 
 ## Missing widgets
 
@@ -83,7 +83,7 @@ Genuine gaps against ratada, ordered by usefulness. Everything here is something
 
 ## Deliberately not rebuilt
 
-ratada implements the following because ratatui draws every cell itself. Textual provides them, so reimplementing them in termz would be duplicated work that ages badly. This list exists to stop that happening.
+ratada implements the following because ratatui draws every cell itself. Textual provides them, so reimplementing them in termcore would be duplicated work that ages badly. This list exists to stop that happening.
 
 - Command palette: `App.COMMANDS` with a `Provider`.
 - Collapsible tree: `Tree` and `Collapsible`.
@@ -101,7 +101,7 @@ A third group does not arise at all in a Textual application: the terminal guard
 
 ## Repo hygiene
 
-ratada has each of these; termz has none of them.
+ratada has each of these; termcore has none of them.
 
 - [x] `CLAUDE.md` with the project-specific conventions.
-- [x] `docs/` holding `DEVELOPMENT.md` and a `CLEAN-UP.md` walkthrough checklist. Done, modelled on ratada's rather than termplate's: termplate's DEVELOPMENT.md is a signpost because `_TEMPLATE_GUIDE.md` carries everything, and termz has no such document. `tests/test_docs.py` came with them, which is what turned up the six horizontal rules in the README that section 1.5.1 forbids.
+- [x] `docs/` holding `DEVELOPMENT.md` and a `CLEAN-UP.md` walkthrough checklist. Done, modelled on ratada's rather than termplate's: termplate's DEVELOPMENT.md is a signpost because `_TEMPLATE_GUIDE.md` carries everything, and termcore has no such document. `tests/test_docs.py` came with them, which is what turned up the six horizontal rules in the README that section 1.5.1 forbids.

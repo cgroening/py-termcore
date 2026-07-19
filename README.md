@@ -1,36 +1,36 @@
-# termz
+# termcore
 
 Terminal utilities for CLI, TUI, IO and general use.
 
 ## Overview
 
-**termz** is a Python library that bundles reusable building blocks for terminal applications. It is organized into four sub-packages:
+**termcore** is a Python library that bundles reusable building blocks for terminal applications. It is organized into four sub-packages:
 
 | Package | Contents |
 |---------|----------|
-| `termz.cli` | Styled console output via [Rich](https://github.com/Textualize/rich) |
-| `termz.tui` | [Textual](https://github.com/Textualize/textual) TUI helpers – theme loading, custom widgets, modal screens |
-| `termz.io` | SQLite database abstraction, JSON app-state storage, file utilities |
-| `termz.util` | Datetime helpers, string utilities, singleton metaclass, debug decorators, logging setup |
+| `termcore.cli` | Styled console output via [Rich](https://github.com/Textualize/rich) |
+| `termcore.tui` | [Textual](https://github.com/Textualize/textual) TUI helpers – theme loading, custom widgets, modal screens |
+| `termcore.io` | SQLite database abstraction, JSON app-state storage, file utilities |
+| `termcore.util` | Datetime helpers, string utilities, singleton metaclass, debug decorators, logging setup |
 
 ## Requirements
 
 - Python >= 3.12
 - [`rich`](https://pypi.org/project/rich/)
-- [`textual`](https://pypi.org/project/textual/) (required for `termz.tui`)
+- [`textual`](https://pypi.org/project/textual/) (required for `termcore.tui`)
 
 ## Installation
 
 ```bash
-pip install termz
+pip install termcore
 ```
 
-## termz.cli – Styled CLI Output
+## termcore.cli – Styled CLI Output
 
 Provides helpers for printing color-coded panels using Rich and for clearing terminal output.
 
 ```python
-from termz import print_error, print_warning, print_success, print_info, clear_lines
+from termcore import print_error, print_warning, print_success, print_info, clear_lines
 
 print_success("File saved.")
 print_warning("Disk space is low.")
@@ -54,7 +54,7 @@ clear_lines(4)
 | `clear_lines(count)` | Move cursor up `count` lines and clear everything below |
 | `get_console()` | Returns the shared Rich `Console` instance |
 
-## termz.tui – Textual TUI Helpers
+## termcore.tui – Textual TUI Helpers
 
 ### ThemeLoader
 
@@ -62,13 +62,13 @@ Dynamically loads and registers [Textual](https://github.com/Textualize/textual)
 
 A theme is identified by the `name` of its `TEXTUAL_THEME` plus the prefix it is registered under – the name of its directory carries no meaning and is free to differ. A theme without a stylesheet is equally valid; ten of the built-in themes below ship none. Each theme folder is read on its own, so an app can register several loaders and its own themes never collide with the ones the toolkit brings.
 
-termz ships 16 built-in themes:
+termcore ships 16 built-in themes:
 
 `classic-black-saturated`, `classic-black-v1`, `classic-black-v2`, `classic-blue`, `compact-gray`, `mnml-black`, `mnml-deepblack`, `pure-amber`, `pure-black`, `pure-blue`, `pure-green`, `pure-sweet16`, `xplore-black`, `xplore-blue`, `xplore-blue-muted`, `xplore-teal`
 
 ```python
 from pathlib import Path
-from termz import ThemeLoader
+from termcore import ThemeLoader
 
 loader = ThemeLoader("themes")              # bundled themes plus that folder
 loader = ThemeLoader.custom_only("themes")  # only that folder
@@ -77,7 +77,7 @@ loader = ThemeLoader.custom_only("themes")  # only that folder
 loader.register_themes_in_textual_app(app)
 loader.set_previous_theme_in_textual_app(
     app,
-    default_theme_name="TERMZ_xplore-blue",
+    default_theme_name="TERMCORE_xplore-blue",
     theme_config_file=Path("~/.config/myapp/theme.json").expanduser(),
 )
 
@@ -91,7 +91,7 @@ loader.change_to_next_or_previous_theme(direction=1, app=app)
 
 Theme name prefixes:
 
-- Built-in termz themes: `TERMZ_` (e.g. `TERMZ_xplore-blue`)
+- Built-in termcore themes: `TERMCORE_` (e.g. `TERMCORE_xplore-blue`)
 - Custom themes: `CUSTOM_` (e.g. `CUSTOM_mytheme`)
 
 Both prefixes can be customized via the `ThemeLoader` constructor.
@@ -101,7 +101,7 @@ Both prefixes can be customized via the `ThemeLoader` constructor.
 A Textual `ModalScreen` that presents a yes/no dialog and returns a `bool`.
 
 ```python
-from termz import QuestionScreen, ButtonColor
+from termcore import QuestionScreen, ButtonColor
 
 async def confirm_delete(self):
     answer = await self.app.push_screen_wait(
@@ -122,7 +122,7 @@ async def confirm_delete(self):
 A subclass of Textual's `DataTable` that supports *flexible columns* – columns that automatically fill the remaining width when the terminal is resized.
 
 ```python
-from termz.tui.custom_widgets.custom_data_table import CustomDataTable
+from termcore.tui.custom_widgets.custom_data_table import CustomDataTable
 
 table = CustomDataTable()
 col_name = table.add_column("Name", width=20)
@@ -135,7 +135,7 @@ table.flexible_columns = [col_desc]  # This column will stretch to fill space
 A subclass of Textual's `Checkbox` that shows a `✔` when checked and an empty box when unchecked, instead of the default `X`.
 
 ```python
-from termz.tui.custom_widgets.custom_checkbox import CustomCheckbox
+from termcore.tui.custom_widgets.custom_checkbox import CustomCheckbox
 
 yield CustomCheckbox("Enable feature", value=True)
 ```
@@ -145,7 +145,7 @@ yield CustomCheckbox("Enable feature", value=True)
 A subclass of Textual's `SelectionList` whose items show a `✔` when selected and an empty box when unselected, instead of the default `X`.
 
 ```python
-from termz.tui.custom_widgets.custom_selection import CustomSelectionList
+from termcore.tui.custom_widgets.custom_selection import CustomSelectionList
 
 yield CustomSelectionList(
     ("Option A", "a"),
@@ -161,7 +161,7 @@ A drop-in replacement for Textual's built-in `Footer` that supports multiple row
 - **`auto_wrap=False`** – bindings are assigned to rows explicitly via `row_map`.
 
 ```python
-from termz.tui.custom_widgets.multiline_footer import MultiLineFooter
+from termcore.tui.custom_widgets.multiline_footer import MultiLineFooter
 
 # Auto-wrap (default)
 yield MultiLineFooter()
@@ -216,7 +216,7 @@ add_screen:
 **Usage:**
 
 ```python
-from termz.tui.custom_bindings import CustomBindings
+from termcore.tui.custom_bindings import CustomBindings
 
 bindings = CustomBindings("bindings.yaml")                 # file order
 bindings = CustomBindings.sorted_by_key("bindings.yaml")   # sorted by key
@@ -239,14 +239,14 @@ def check_action(self, action, parameters):
     return bindings.handle_check_action(action, parameters, active_group=self.active_tab)
 ```
 
-## termz.io – IO Utilities
+## termcore.io – IO Utilities
 
 ### AppStateStorage
 
 A JSON-backed singleton for persisting small application states (scroll position, last selection, command history, etc.).
 
 ```python
-from termz import AppStateStorage
+from termcore import AppStateStorage
 
 # Initialize once (e.g. at startup)
 storage = AppStateStorage(package_name="myapp")
@@ -272,7 +272,7 @@ A lightweight SQLite abstraction.
 Values are always bound as query parameters, never formatted into the statement, so a value can never be read as SQL. Identifiers cannot be parameters, so a table or column name is checked against the schema of the open database and quoted before it is used; a name that is not part of the schema raises `UnknownIdentifierError` instead of reaching the database. `update` and `remove` refuse an empty condition list with `EmptyConditionsError` rather than rewriting or emptying the whole table.
 
 ```python
-from termz import Database, Condition, SQLComparisonOperator, SQLOrderByDirection, ColumnOrder
+from termcore import Database, Condition, SQLComparisonOperator, SQLOrderByDirection, ColumnOrder
 
 with Database("data.db") as db:
     # Fetch with conditions and ordering
@@ -312,7 +312,7 @@ Leaving the `with` block commits, unless it is left through an exception, in whi
 Static helpers for file and folder operations.
 
 ```python
-from termz import File
+from termcore import File
 
 # List folder contents (optionally filtered by extension and recursive)
 items = File.folder_content("./data", extfilter="csv", withsubfolders=True)
@@ -331,19 +331,19 @@ folder = File.path("/home/user/docs/file.txt")          # "/home/user/docs"
 Simple UTF-8 text file read/write.
 
 ```python
-from termz import Textfile   # or: from termz.io.textfile import Textfile
+from termcore import Textfile   # or: from termcore.io.textfile import Textfile
 
 content = Textfile.read("notes.txt")
 lines   = Textfile.readlines("notes.txt")
 Textfile.write("notes.txt", "New content")
 ```
 
-## termz.util – General Utilities
+## termcore.util – General Utilities
 
 ### Logging
 
 ```python
-from termz import setup_logging
+from termcore import setup_logging
 import logging
 
 setup_logging("myapp", level=logging.INFO)
@@ -355,7 +355,7 @@ setup_logging("myapp", level=logging.INFO)
 A metaclass that enforces the singleton pattern.
 
 ```python
-from termz import Singleton
+from termcore import Singleton
 
 class Config(metaclass=Singleton):
     def __init__(self):
@@ -369,7 +369,7 @@ assert a is b  # True
 ### Datetime
 
 ```python
-from termz import DateFormat, timestamp_to_date, date_to_timestamp, date_diff, today_timestamp, today_date
+from termcore import DateFormat, timestamp_to_date, date_to_timestamp, date_diff, today_timestamp, today_date
 
 ts = date_to_timestamp("01.04.2025")           # German format (default)
 ts = date_to_timestamp("2025-04-01", DateFormat.ISO)
@@ -386,7 +386,7 @@ s_today  = today_date()                        # "02.04.2026"
 ### String
 
 ```python
-from termz import linewrap, charpos, cell_width, str_with_fixed_width
+from termcore import linewrap, charpos, cell_width, str_with_fixed_width
 
 wrapped = linewrap("A long piece of text that should be wrapped.", linewidth=20)
 positions = charpos("hello world", "l")  # [2, 3, 9]
@@ -406,7 +406,7 @@ Widths are counted in terminal cells rather than in code points, so a column sta
 ### Index Navigation
 
 ```python
-from termz import next_index, clamped_index
+from termcore import next_index, clamped_index
 
 # Navigate a list of 5 items, wrapping around at edges
 idx = next_index(current_index=4, length=5, direction=1)  # 0  (wraps)
@@ -422,7 +422,7 @@ idx = next_index(current_index=0, length=0)  # 0
 ### Validation
 
 ```python
-from termz import is_number
+from termcore import is_number
 
 is_number("3.14")  # True
 is_number("abc")   # False
@@ -432,14 +432,14 @@ is_number(None)    # False
 ### Debug Decorators
 
 ```python
-from termz import print_arguments, timing, timing_ns
+from termcore import print_arguments, timing, timing_ns
 
 @print_arguments
 def add(a: int, b: int) -> int:
     return a + b
 
 add(3, 5)
-# Logged at debug level on the `termz.util.debug` logger:
+# Logged at debug level on the `termcore.util.debug` logger:
 #   Function add called
 #   Args: (3, 5)
 #   Kwargs: {}

@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.2] – 2026-07-19
 
 ### Added
 
@@ -16,14 +16,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `py.typed`. Without the marker a consumer's type checker treated the whole package as untyped and degraded every import to `Any`
 - A `[tool.ruff]` section with the rule set from section 3.2.1 of the style guide, and `typeCheckingMode = "strict"` for basedpyright. The library was previously linted on ruff's defaults, which select no rules and enforce no line length
 - `io/errors.py`: `AppStateError` and `StateFileError`
-- `termz/tui/custom_widgets/__init__.py`. The directory was an implicit namespace package, which is one packaging tool away from being dropped from the wheel entirely
+- `termcore/tui/custom_widgets/__init__.py`. The directory was an implicit namespace package, which is one packaging tool away from being dropped from the wheel entirely
 - `clamped_index`, `timing_ns`, `File.folder_content_recursive`, `ThemeLoader.custom_only`, `CustomBindings.sorted_by_key`, `CustomBindings.get_screen_bindings` and `CustomBindings.get_screen_row_map`, each replacing a boolean parameter (section 1.1.2)
 - `DateFormat`, an enum replacing the `english_format` flag of the datetime helpers
 - `cell_width`, which counts the terminal cells a string occupies rather than its code points
-- An `__all__` in every module, so that `from termz import *` carries the public API instead of every module's own imports. The star export shrank from 141 names to 85
+- An `__all__` in every module, so that `from termcore import *` carries the public API instead of every module's own imports. The star export shrank from 141 names to 85
 
 ### Changed
 
+- The project is now called `termcore`. This is a breaking change on three levels: the distribution on PyPI (`pip install termcore`), the import path (`from termcore.tui.theme_loader import ThemeLoader`), and the registration prefix of the bundled themes, which is `TERMCORE_` instead of `TERMZ_`. A theme name stored in a consumer's config file therefore no longer resolves; `ThemeLoader.set_previous_theme` reports this and falls back to the default rather than failing. The `termz` releases on PyPI are not maintained further
+- `ThemeLoader`: The keyword argument `termz_theme_prefix` is now `termcore_theme_prefix`, and the constant `DEFAULT_TERMZ_THEME_PREFIX` is `DEFAULT_TERMCORE_THEME_PREFIX`
 - `CustomBindings`: Global bindings are no longer prefixed with `*`
 - Updated colors of Textual themes `compact-gray` and `mnml-deepblack`
 - `ThemeLoader`: A theme is now identified by the `name` in its `theme.py` plus its registration prefix. The directory name is no longer used as a key, so it may differ freely, and a standard and a custom theme may share a name
@@ -40,7 +42,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `str_with_fixed_width`: The alignment is validated before the text length is looked at, so an invalid value is rejected either way
 - Every boolean parameter that selected behaviour is gone, replaced by a second named function, a factory or an enum: `next_index(loop_behavior=)`, `timing(use_ns_timer=)`, `File.folder_content(withsubfolders=)`, `ThemeLoader(include_standard_themes=)`, `CustomBindings(sort_alphabetically=)`, `get_bindings(for_screen=)`, `get_row_map(for_screen=)` and `english_format=` on the five datetime helpers. All of these are breaking
 - `AppStateStorage`: A failure to read, create or write the state file raises `StateFileError` instead of printing a message and calling `sys.exit()`. A library taking the whole process down left the caller no way to react
-- `termz.util.debug`: The decorators log at debug level through a module logger instead of printing to stdout
+- `termcore.util.debug`: The decorators log at debug level through a module logger instead of printing to stdout
 - File and directory handling moved from `os.path` to `pathlib` throughout
 - `str_with_fixed_width` counts terminal cells instead of code points, so a column holding CJK text or emoji stays aligned. A double-width glyph cannot be split, so where one would straddle the boundary the result is padded to reach the width exactly. Breaking for anyone who relied on the returned string having exactly `width` characters
 - `date_diff` compares local calendar dates instead of dividing by 86400. Two moments on the same day are 0 days apart whatever the clock says, and a span crossing a daylight saving switch is no longer off by one
@@ -53,7 +55,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `next_index`: An empty list raised `ZeroDivisionError` instead of yielding index 0, and the clamped branch ignored the step size while the wrapping branch honoured it
 - `str_with_fixed_width`: Did not return the promised number of characters at the edges. Width 1 with `align="right"` returned the entire string, because the offset became `-0`; width 0 returned the text minus its last character
 - `linewrap`: Raised `ValueError` on a word longer than the line, and looped forever for a width below 1
-- `termz.util.datetime` resolved to the `datetime` class rather than the module, because the package's star-import re-exported the imported name over the submodule
+- `termcore.util.datetime` resolved to the `datetime` class rather than the module, because the package's star-import re-exported the imported name over the submodule
 - `Database.fetch`: An offset without a limit produced a syntax error, `limit=0` was silently dropped, and an empty column list produced `SELECT  FROM`
 - `Database`: `ORDER BY` and `WHERE` were joined using identity checks against the first and last element, so passing the same `Condition` or `ColumnOrder` object twice produced malformed SQL
 - `Database.insert`: Read the new row back through a hard-coded `id` column, which failed after the write on any table without one, and committed each row separately, so a failure half way through left the earlier rows behind
@@ -62,8 +64,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - `ThemeLoader`: The theme registry was held in class attributes shared by every instance, and registration re-prefixed the same `Theme` objects each time. A second application in one process saw `CUSTOM_CUSTOM_<name>`, a third `CUSTOM_CUSTOM_CUSTOM_<name>`. State is now per instance and the prefix is applied once, to a copy
 - `ThemeLoader`: A theme folder whose name differed from the `name` in its `theme.py` registered but silently lost its stylesheet
 - `ThemeLoader`: From the second loader in a process on, the bundled themes were not found at all, because a consumer's theme folder shadowed them under the shared package name `themes`. The bug was masked by the shared registry described above
-- `ThemeLoader`: Switching themes never removed the stylesheet of a theme outside termz's own theme folder, so a consumer's CSS stayed applied on top of every theme it switched to
-- `ThemeLoader`: A theme without a stylesheet, and any theme not registered by termz such as Textual's built-ins, logged a warning during entirely normal use. This is reported at debug level now
+- `ThemeLoader`: Switching themes never removed the stylesheet of a theme outside termcore's own theme folder, so a consumer's CSS stayed applied on top of every theme it switched to
+- `ThemeLoader`: A theme without a stylesheet, and any theme not registered by termcore such as Textual's built-ins, logged a warning during entirely normal use. This is reported at debug level now
 - `ThemeLoader`: Diagnostics went to the root logger and surfaced as `WARNING:root:` in every consumer; they now use a module logger and lazy formatting
 - `ThemeLoader`: Two theme folders declaring the same name silently overwrote each other; the second is now refused with an error
 - `Singleton`: The metaclass reported `object` as the type of every instance it built, so a consumer type-checking against a singleton got no type at all. It now reports the class it constructed
@@ -90,4 +92,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 *PyPI name reservation – no functional code.*
 
-[Unreleased]: https://github.com/cgroening/py-termz/compare/v0.1.1...HEAD [0.1.1]: https://github.com/cgroening/py-termz/compare/v0.1.0...v0.1.1 [0.1.0]: https://github.com/cgroening/py-termz/releases/tag/v0.1.0
+[0.1.2]: https://github.com/cgroening/py-termcore/compare/v0.1.1...v0.1.2 [0.1.1]: https://github.com/cgroening/py-termcore/compare/v0.1.0...v0.1.1 [0.1.0]: https://github.com/cgroening/py-termcore/releases/tag/v0.1.0
