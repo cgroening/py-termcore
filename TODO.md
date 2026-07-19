@@ -62,7 +62,7 @@ Noticed while writing its tests, deliberately left alone to keep that change foc
 
 ## Release
 
-- [ ] Publish 0.1.2, the first release under the name `termcore`. It is prepared but not uploaded. Everything termplate needs exists only in this working copy: `util/version.py`, the named replacements for the three flag arguments, and the `TERMCORE_` theme prefix. Until the upload happens, termplate's `termcore>=0.1.2` constraint resolves to nothing and the app cannot be installed by anyone else. The old `termz` releases stay on PyPI untouched – not yanked, just no longer maintained.
+- [ ] Publish 0.2.0, the first release under the name `termcore`. It is prepared but not uploaded. Everything termplate needs exists only in this working copy: `util/version.py`, the named replacements for the three flag arguments, and the `TERMCORE_` theme prefix. Until the upload happens, termplate's `termcore>=0.2.0` constraint resolves to nothing and the app cannot be installed by anyone else. The old `termz` releases stay on PyPI untouched – not yanked, just no longer maintained.
 
 ## Missing widgets
 

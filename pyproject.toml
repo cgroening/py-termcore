@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "termcore"
-version = "0.1.2"
+version = "0.2.0"
 description = "Terminal utilities for CLI, TUI, IO and general use"
 readme = "README.md"
 license = { text = "MIT" }
