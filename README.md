@@ -155,71 +155,97 @@ yield CustomSelectionList(
 
 ### MultiLineFooter
 
-A drop-in replacement for Textual's built-in `Footer` that supports multiple rows of key bindings. Two modes are available:
+A drop-in replacement for Textual's built-in `Footer` that supports multiple rows of key bindings. Which of its two modes applies follows from whether groups are passed:
 
-- **`auto_wrap=True`** (default) – bindings wrap automatically when the row is full.
-- **`auto_wrap=False`** – bindings are assigned to rows explicitly via `row_map`.
+- **without `groups`** – the keys wrap onto a new row whenever the current one is full.
+- **with `groups`** – each declared group becomes one row, its label printed in a column on the left and its keys separated by ` · `. A group too wide for the terminal wraps onto continuation rows whose label cell stays blank, so the keys line up under the keys rather than under the label.
 
 ```python
+from termcore.tui.custom_bindings import CustomBindings
 from termcore.tui.custom_widgets.multiline_footer import MultiLineFooter
 
-# Auto-wrap (default)
+bindings = CustomBindings("bindings.yaml")
+
+# Wrap on width
 yield MultiLineFooter()
 
-# Manual row assignment
-yield MultiLineFooter(
-    auto_wrap=False,
-    row_map={
-        'quit': 0,
-        'save': 0,
-        'toggle_dark': 1,
-        'help': 1,
-    },
-)
+# One row per group, in the order the YAML file declares them
+yield MultiLineFooter(groups=bindings.get_groups())
 ```
+
+```text
+Tasks:       a Add · d Done
+Appearance:  w Previous Theme · s Next Theme
+App:         ? Help · q Quit
+```
+
+`get_groups()` returns every declared group, not only the ones belonging to the current screen. A group whose bindings are not active right now renders no row at all, so the same call serves every screen.
+
+### HelpScreen
+
+The overlay style guide section 1.8 asks every terminal interface for: every shortcut, grouped, with a fuzzy search over them. It reads the same groups the footer does, so a binding cannot appear in one and be missing from the other.
+
+```python
+from termcore.tui.binding_groups import active_actions
+from termcore.tui.help_screen import HelpScreen
+
+def action_help(self) -> None:
+    # Snapshot before the push: afterwards `self.screen` is the modal.
+    active = active_actions(self.screen)
+    self.push_screen(HelpScreen(bindings.get_groups(), active))
+```
+
+It opens listing every declared shortcut. `ctrl+t` narrows the list to the bindings that would actually fire where the overlay was opened, which is what the snapshot above feeds; `escape` and `?` close it. Matching is Textual's own `Matcher`, the fuzzy search behind its command palette, so `ntm` finds "next theme".
 
 ### CustomBindings
 
 Loads keyboard bindings from a YAML file and exposes them as Textual `Binding` objects. Supports global bindings, tab-specific bindings, and screen-specific bindings.
 
-**Group naming conventions:**
+Two words are kept apart and are not interchangeable. A **scope** is a top-level key of the file: it decides when a binding is visible and how its action is named. A **group** is one labelled footer row inside a scope: it decides only how the footer and the help overlay lay the bindings out. Grouping is optional.
 
-| Group name | Scope | Action prefix |
-|------------|-------|---------------|
+**Scope naming conventions:**
+
+| Scope name | Visibility | Action prefix |
+|------------|------------|---------------|
 | `_global` | Always visible | none (used as-is) |
 | `<name>_tab` | Shown when that tab is active | `<name>_tab_` |
 | `<name>_screen` | Shown on that screen | none (used as-is) |
 
+The order of the file is the order of the footer, without exception. Nothing is re-sorted on the way out, so a scope moved in the file moves its rows - which is why `_global` usually belongs at the bottom.
+
 **YAML example (`bindings.yaml`):**
 
 ```yaml
-_global:
-  - key: q
-    action: quit
-    description: Quit
-    priority: true
-    row: 1
-
 tasks_tab:
-  - key: a
-    action: add_task
-    description: Add
-    row: 0
+  - group: Tasks
+    bindings:
+      - key: a
+        action: add_task
+        description: Add
+      - key: d
+        action: mark_done
+        description: Done
+  - key: z            # no group: its own row, no label
+    action: zoom
+    description: Zoom
 
-add_screen:
-  - key: escape
-    action: cancel
-    description: Cancel
-    row: 0
+_global:
+  - group: App
+    bindings:
+      - key: q
+        action: quit
+        description: Quit
+        priority: true
 ```
+
+An entry carrying `bindings` is a group; an entry carrying `key` is a single binding. Both may be mixed inside one scope, and consecutive single bindings share one unlabelled row.
 
 **Usage:**
 
 ```python
 from termcore.tui.custom_bindings import CustomBindings
 
-bindings = CustomBindings("bindings.yaml")                 # file order
-bindings = CustomBindings.sorted_by_key("bindings.yaml")   # sorted by key
+bindings = CustomBindings("bindings.yaml")   # file order, always
 
 # In your App or Screen:
 # On the App: globals dispatch as declared
@@ -230,13 +256,14 @@ BINDINGS = bindings.get_bindings(tab_name="tasks_tab")  # one tab + global
 BINDINGS = bindings.get_screen_bindings()               # every tab + global
 BINDINGS = bindings.get_screen_bindings("add")          # that screen + global
 
-# Row map for MultiLineFooter(auto_wrap=False):
-row_map = bindings.get_row_map()         # pair with get_bindings
-row_map = bindings.get_screen_row_map()  # pair with get_screen_bindings
+# Footer rows and help overlay, both from the same call:
+groups = bindings.get_groups()
 
 # In check_action to hide tab bindings that don't belong to the active tab:
 def check_action(self, action, parameters):
-    return bindings.handle_check_action(action, parameters, active_group=self.active_tab)
+    return bindings.handle_check_action(
+        dispatch_name(action), parameters, active_scope=self.active_tab
+    )
 ```
 
 ## termcore.io – IO Utilities

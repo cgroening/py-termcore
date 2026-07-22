@@ -1,44 +1,55 @@
 """
 MultiLineFooter - a multi-line footer extending Textual's built-in Footer.
 
-Two modes:
+Two modes, chosen by whether groups are passed:
 
-  1. auto_wrap=True   → Bindings automatically wrap when the row is full.
-  2. auto_wrap=False  → Bindings are explicitly assigned to rows via `row_map`.
+  1. MultiLineFooter()                → keys wrap on width alone.
+  2. MultiLineFooter(groups=[...])    → one row per group, labels aligned
+                                        in a column on the left.
 
 Usage:
-    # Auto-wrap (default)
+    # Wrap on width
     yield MultiLineFooter()
 
-    # Manual row assignment
-    yield MultiLineFooter(
-        auto_wrap=False,
-        row_map={
-            "quit": 0,
-            "save": 0,
-            "toggle_dark": 1,
-            "help": 1,
-        },
-    )
+    # One row per declared group
+    yield MultiLineFooter(groups=CUSTOM_BINDINGS.get_groups())
 
-The `row_map` maps binding actions to row numbers (0-based).
-Unassigned bindings fall into the last defined row.
+Groups come from `CustomBindings.get_groups()`, so the order of the rows is
+the order of the YAML file. A group whose bindings are not active right now
+renders no row, which is what lets one call cover every screen.
+
+The arithmetic lives in `footer_rows`; this module only turns row plans into
+widgets.
 """
 from __future__ import annotations
 
-from collections import defaultdict
+from collections.abc import Sequence
 from typing import cast, override
 
 from textual.app import App, ComposeResult
-from textual.binding import Binding
 from textual.containers import HorizontalGroup
 from textual.reactive import reactive
+from textual.widgets import Static
 from textual.widgets._footer import Footer, FooterKey
 
+from termcore.tui.binding_groups import BindingGroup
+from termcore.tui.custom_widgets.footer_rows import (
+    SEPARATOR,
+    FooterHint,
+    FooterLayout,
+    FooterRowPlan,
+    hint_width,
+)
+from termcore.util.string import cell_width
+
 __all__ = [
+    "FooterGroupLabel",
     "FooterRow",
+    "FooterSeparator",
     "MultiLineFooter",
 ]
+
+_FALLBACK_WIDTH = 80
 
 
 class FooterRow(HorizontalGroup):
@@ -54,22 +65,71 @@ class FooterRow(HorizontalGroup):
     """
 
 
+class FooterGroupLabel(Static):
+    """
+    The label in front of a group's row.
+
+    The text arrives already padded to the shared column width, and the
+    widget is sized from it, so every row's keys start in the same column
+    without a second layout pass.
+    """
+
+    ALLOW_SELECT = False
+
+    DEFAULT_CSS: str = """
+    FooterGroupLabel {
+        height: 1;
+        text-wrap: nowrap;
+        color: $footer-description-foreground;
+        background: $footer-background;
+    }
+    """
+
+    def __init__(self, label: str) -> None:
+        """Builds a label cell of exactly the width of the given text."""
+        super().__init__(label)
+        self.styles.width = cell_width(label)
+
+
+class FooterSeparator(Static):
+    """
+    The mark between two keys of the same group.
+
+    `FooterKey` already pads itself on both sides, so this carries the bare
+    separator and lets those paddings supply the surrounding spaces.
+    """
+
+    ALLOW_SELECT = False
+
+    DEFAULT_CSS: str = """
+    FooterSeparator {
+        height: 1;
+        text-wrap: nowrap;
+        color: $footer-description-foreground;
+        background: $footer-background;
+    }
+    """
+
+    def __init__(self) -> None:
+        """Builds a separator cell."""
+        super().__init__(SEPARATOR)
+        self.styles.width = cell_width(SEPARATOR)
+
+
 class MultiLineFooter(Footer):
     """
-    Multi-line footer with auto-wrap or manual row assignment.
+    Multi-line footer with grouped rows or width-based wrapping.
 
-    Inherits from Textual's built-in Footer and overrides the layout to support
-    multiple rows.
+    Inherits from Textual's built-in Footer and overrides the layout to
+    support multiple rows.
 
     Attributes
     ----------
-    auto_wrap : bool, default True
-        If True, bindings wrap automatically based on terminal width.
-    row_map : dict[str, int] or None, optional
-        Dict mapping action names to row numbers (0-based).
-        Only relevant when ``auto_wrap=False``.
+    groups : Sequence[BindingGroup] or None, optional
+        The declared groups. Given, each one becomes a row labelled on the
+        left; omitted, the keys wrap on width alone.
     max_rows : int, default 0
-        Maximum number of rows for auto-wrap. 0 means unlimited.
+        The most rows one group may occupy. 0 means unlimited.
     show_command_palette : bool, default True
         Show the command palette binding.
     compact : bool, default False
@@ -84,15 +144,13 @@ class MultiLineFooter(Footer):
     }
     """
 
-    auto_wrap: reactive[bool] = reactive(default=True)
     max_rows: reactive[int] = reactive(0)
     _bindings_ready: bool
 
     def __init__(  # noqa: PLR0913 - mirrors Textual's Widget signature
         self,
         *,
-        auto_wrap: bool = True,
-        row_map: dict[str, int] | None = None,
+        groups: Sequence[BindingGroup] | None = None,
         max_rows: int = 0,
         show_command_palette: bool = True,
         compact: bool = False,
@@ -107,19 +165,10 @@ class MultiLineFooter(Footer):
             show_command_palette=show_command_palette,
             compact=compact,
         )
-        self._row_map: dict[str, int] = row_map or {}
-        self.set_reactive(MultiLineFooter.auto_wrap, auto_wrap)
+        self._groups: tuple[BindingGroup, ...] = tuple(groups or ())
         self.set_reactive(MultiLineFooter.max_rows, max_rows)
 
-    @staticmethod
-    def _estimate_key_width(key_display: str, description: str) -> int:
-        """Estimates the width of a FooterKey in columns (including padding)."""
-        w = 1 + len(key_display) + 1   # key padding
-        if description:
-            w += len(description) + 1  # description + right padding
-        return w
-
-    def _collect_bindings(self) -> list[tuple[Binding, bool, str]]:
+    def _collect_hints(self) -> list[FooterHint]:
         """Collects active visible bindings, excluding the command palette."""
         active = self.screen.active_bindings
         app = cast("App[object]", self.app)
@@ -128,104 +177,98 @@ class MultiLineFooter(Footer):
             if self.show_command_palette and app.ENABLE_COMMAND_PALETTE
             else None
         )
+
         return [
-            (binding, enabled, tooltip)
+            FooterHint(binding, enabled, tooltip)
             for key_str, (_node, binding, enabled, tooltip) in active.items()
             if binding.show and key_str != palette_key
         ]
 
-    def _get_palette_binding(self) -> tuple[Binding, bool, str] | None:
-        """Returns the command palette binding tuple or None."""
+    def _get_palette_hint(self) -> FooterHint | None:
+        """Returns the command palette hint, or None when it is hidden."""
         app = cast("App[object]", self.app)
         if not (self.show_command_palette and app.ENABLE_COMMAND_PALETTE):
             return None
+
         try:
             _node, binding, enabled, tooltip = self.screen.active_bindings[
                 app.COMMAND_PALETTE_BINDING
             ]
         except KeyError:
             return None
-        return binding, enabled, tooltip
 
-    def _build_rows_auto(
-        self, bindings: list[tuple[Binding, bool, str]]
-    ) -> list[list[tuple[Binding, bool, str]]]:
-        """Distributes bindings across rows based on available width."""
-        available = self.size.width or 80
-        rows: list[list[tuple[Binding, bool, str]]] = [[]]
-        current_width = 0
+        return FooterHint(binding, enabled, tooltip)
+
+    def _available_width(self, palette: FooterHint | None) -> int:
+        """
+        Returns the width the rows may use.
+
+        The command palette key is docked to the right of the last row, so
+        its width is taken off the budget. Reserving it for every row costs
+        a little space above, and is the price of never overlapping it.
+        """
+        width = self.size.width or _FALLBACK_WIDTH
+        if palette is None:
+            return width
 
         app = cast("App[object]", self.app)
-        for binding, enabled, tooltip in bindings:
-            key_display = app.get_key_display(binding)
-            w = self._estimate_key_width(key_display, binding.description) + 1
-            if current_width + w > available and rows[-1]:
-                if self.max_rows > 0 and len(rows) >= self.max_rows:
-                    rows[-1].append((binding, enabled, tooltip))
-                    current_width += w
-                    continue
-                rows.append([])
-                current_width = 0
-            rows[-1].append((binding, enabled, tooltip))
-            current_width += w
+        reserved = hint_width(
+            app.get_key_display(palette.binding), palette.binding.description
+        )
 
-        return rows
+        return max(width - reserved, 1)
 
-    def _build_rows_manual(
-        self, bindings: list[tuple[Binding, bool, str]]
-    ) -> list[list[tuple[Binding, bool, str]]]:
-        """Distributes bindings across rows using the row_map."""
-        grouped: defaultdict[int, list[tuple[Binding, bool, str]]] = \
-            defaultdict(list)
-        fallback_row = max(self._row_map.values(), default=0)
+    def _build_rows(self, palette: FooterHint | None) -> list[FooterRowPlan]:
+        """Returns the row plans for the current bindings and width."""
+        app = cast("App[object]", self.app)
+        layout = FooterLayout(
+            key_display=app.get_key_display,
+            width=self._available_width(palette),
+            max_rows=self.max_rows,
+        )
+        hints = self._collect_hints()
 
-        for binding, enabled, tooltip in bindings:
-            grouped[self._row_map.get(binding.action, fallback_row)].append(
-                (binding, enabled, tooltip)
-            )
-        if not grouped:
-            return []
-        return [grouped[i] for i in sorted(grouped.keys())]
+        if self._groups:
+            return layout.group_rows(self._groups, hints)
+
+        return layout.flat_rows(hints)
+
+    def _footer_key(self, hint: FooterHint, classes: str = "") -> FooterKey:
+        """Builds the widget for one key."""
+        app = cast("App[object]", self.app)
+
+        return FooterKey(
+            hint.binding.key,
+            app.get_key_display(hint.binding),
+            hint.binding.description,
+            hint.binding.action,
+            disabled=not hint.enabled,
+            tooltip=hint.tooltip or hint.binding.description,
+            classes=classes,
+        )
 
     @override
     def compose(self) -> ComposeResult:
         if not self._bindings_ready:
             return
 
-        app = cast("App[object]", self.app)
-        bindings = self._collect_bindings()
-        rows = (
-            self._build_rows_auto(bindings)
-            if self.auto_wrap
-            else self._build_rows_manual(bindings)
-        )
-        palette = self._get_palette_binding()
+        palette = self._get_palette_hint()
+        rows = self._build_rows(palette)
 
-        for row_idx, row_bindings in enumerate(rows):
+        for row_index, row in enumerate(rows):
             with FooterRow():
-                for binding, enabled, tooltip in row_bindings:
-                    yield FooterKey(
-                        binding.key,
-                        app.get_key_display(binding),
-                        binding.description,
-                        binding.action,
-                        disabled=not enabled,
-                        tooltip=tooltip or binding.description,
-                    ).data_bind(compact=Footer.compact)
-                # Place the command palette in the first row
-                # if row_idx == 0 and palette:
-                # Place the command palette in the last row
-                if row_idx == len(rows) - 1 and palette:
-                    b, en, tt = palette
-                    yield FooterKey(
-                        b.key,
-                        app.get_key_display(b),
-                        b.description,
-                        b.action,
-                        disabled=not en,
-                        tooltip=tt or b.description,
-                        classes="-command-palette",
+                if row.label:
+                    yield FooterGroupLabel(row.label)
+
+                for hint_index, hint in enumerate(row.hints):
+                    if hint_index:
+                        yield FooterSeparator()
+                    yield self._footer_key(hint).data_bind(
+                        compact=Footer.compact
                     )
+
+                if palette is not None and row_index == len(rows) - 1:
+                    yield self._footer_key(palette, "-command-palette")
 
     @override
     def on_mount(self) -> None:
@@ -235,6 +278,6 @@ class MultiLineFooter(Footer):
         _ = self.call_after_refresh(self.recompose)
 
     def on_resize(self) -> None:
-        """Re-wraps on terminal resize (auto-wrap mode only)."""
-        if self.auto_wrap and self._bindings_ready:
+        """Re-wraps on terminal resize; both modes depend on the width."""
+        if self._bindings_ready:
             _ = self.call_after_refresh(self.recompose)

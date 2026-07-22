@@ -1,9 +1,13 @@
 """Tests for loading key bindings from YAML and composing them per context.
 
-The group name is a contract, not a label: it decides whether an action is
+The scope name is a contract, not a label: it decides whether an action is
 prefixed, when it is visible, and which object Textual dispatches it on. None
 of that fails loudly when it drifts - the shortcut simply stops working - so
 the rules are pinned here rather than left to the consumer to discover.
+
+The second contract is the order of `get_groups`, which is the order of the
+footer. Nothing reorders it on the way out, so a test that pins file order
+is what keeps that promise true.
 """
 
 import logging
@@ -20,7 +24,6 @@ _global:
   - key: q
     action: quit
     description: Quit
-    row: 1
 tasks_tab:
   - key: a
     action: add
@@ -46,7 +49,7 @@ class TestBindingsAreLoadedPerInstance:
 
     A second CustomBindings in one process inherited the first one's groups
     and appended its own on top, so every binding appeared twice and every
-    action mapped to its group twice.
+    action mapped to its scope twice.
     """
 
     def test_a_second_instance_sees_the_same_bindings(
@@ -71,7 +74,7 @@ class TestBindingsAreLoadedPerInstance:
             "tasks_tab_add", "done_tab_reopen", "quit"
         ]
 
-    def test_a_second_instance_does_not_double_the_row_map(
+    def test_a_second_instance_does_not_double_the_groups(
         self, write_bindings: WriteBindings
     ) -> None:
         path = write_bindings(BINDINGS)
@@ -79,7 +82,7 @@ class TestBindingsAreLoadedPerInstance:
         first = CustomBindings(path)
         second = CustomBindings(path)
 
-        assert second.get_row_map() == first.get_row_map()
+        assert second.get_groups() == first.get_groups()
 
     def test_two_instances_over_different_files_stay_separate(
         self, write_bindings: WriteBindings
@@ -104,7 +107,7 @@ class TestActionPrefixing:
 
         assert "quit" in actions(bindings.get_bindings())
 
-    def test_a_tab_action_is_prefixed_with_its_group(
+    def test_a_tab_action_is_prefixed_with_its_scope(
         self, write_bindings: WriteBindings
     ) -> None:
         bindings = CustomBindings(write_bindings(BINDINGS))
@@ -118,11 +121,11 @@ class TestActionPrefixing:
 
         assert "cancel" in actions(bindings.get_screen_bindings("add"))
 
-    def test_any_group_that_is_neither_prefixes_the_action(
+    def test_any_scope_that_is_neither_prefixes_the_action(
         self, write_bindings: WriteBindings
     ) -> None:
         # Only the _global prefix and the _screen suffix are special; every
-        # other group name becomes the action prefix, "_tab" or not.
+        # other scope name becomes the action prefix, "_tab" or not.
         bindings = CustomBindings(write_bindings("""
             whatever:
               - key: a
@@ -289,62 +292,141 @@ class TestGetBindings:
         assert "app.quit" in actions(second)
         assert "app.app.quit" not in actions(second)
 
-    def test_sorting_treats_function_keys_numerically(
+
+GROUPED = """
+tasks_tab:
+  - group: Tasks
+    bindings:
+      - key: a
+        action: add
+        description: Add
+      - key: d
+        action: done
+        description: Done
+  - key: x
+    action: extra
+    description: Extra
+  - key: z
+    action: zoom
+    description: Zoom
+  - group: Appearance
+    bindings:
+      - key: t
+        action: theme
+        description: Theme
+_global:
+  - group: App
+    bindings:
+      - key: q
+        action: quit
+        description: Quit
+"""
+
+
+def group_names(bindings: CustomBindings) -> list[str]:
+    """Returns the name of every group, in the order they are returned."""
+    return [group.name for group in bindings.get_groups()]
+
+
+class TestGetGroups:
+    """The order of these groups is the order of the footer rows.
+
+    Nothing sorts them on the way out, so moving a group in the file is the
+    only way to move its row - and a test is the only thing that keeps that
+    promise from quietly acquiring an exception.
+    """
+
+    def test_groups_come_out_in_file_order(
         self, write_bindings: WriteBindings
     ) -> None:
-        # Plain string sorting would put f10 before f2.
-        bindings = CustomBindings.sorted_by_key(write_bindings("""
+        bindings = CustomBindings(write_bindings(GROUPED))
+
+        assert group_names(bindings) == ["Tasks", "", "Appearance", "App"]
+
+    def test_bindings_keep_their_order_within_a_group(
+        self, write_bindings: WriteBindings
+    ) -> None:
+        bindings = CustomBindings(write_bindings(GROUPED))
+
+        assert actions(bindings.get_groups()[0].bindings) == [
+            "tasks_tab_add", "tasks_tab_done"
+        ]
+
+    def test_consecutive_loose_bindings_form_one_unnamed_group(
+        self, write_bindings: WriteBindings
+    ) -> None:
+        # They sit between two named groups, so they may neither be swallowed
+        # by a neighbour nor split into a row each.
+        bindings = CustomBindings(write_bindings(GROUPED))
+        unnamed = bindings.get_groups()[1]
+
+        assert unnamed.name == ""
+        assert actions(unnamed.bindings) == ["tasks_tab_extra",
+                                             "tasks_tab_zoom"]
+
+    def test_a_group_carries_the_scope_it_came_from(
+        self, write_bindings: WriteBindings
+    ) -> None:
+        bindings = CustomBindings(write_bindings(GROUPED))
+
+        assert [group.scope for group in bindings.get_groups()] == [
+            "tasks_tab", "tasks_tab", "tasks_tab", "_global"
+        ]
+
+    def test_the_same_name_in_two_scopes_stays_two_groups(
+        self, write_bindings: WriteBindings
+    ) -> None:
+        # Merging them would produce one row fed from two places in the file.
+        bindings = CustomBindings(write_bindings("""
+            tasks_tab:
+              - group: Appearance
+                bindings:
+                  - key: z
+                    action: zoom
+                    description: Zoom
             _global:
-              - key: f10
-                action: ten
-                description: Ten
-              - key: f2
-                action: two
-                description: Two
+              - group: Appearance
+                bindings:
+                  - key: w
+                    action: theme
+                    description: Theme
         """))
 
-        assert actions(bindings.get_bindings()) == ["two", "ten"]
+        assert group_names(bindings) == ["Appearance", "Appearance"]
+        assert [group.scope for group in bindings.get_groups()] == [
+            "tasks_tab", "_global"
+        ]
 
+    def test_a_global_group_is_not_moved_to_the_end(
+        self, write_bindings: WriteBindings
+    ) -> None:
+        # get_bindings still registers globals last, but that is Textual's
+        # registration order and must not leak into the footer's layout.
+        bindings = CustomBindings(write_bindings(BINDINGS))
 
-class TestGetRowMap:
-    def test_rows_come_from_the_yaml(
+        assert group_names(bindings) == ["", "", "", ""]
+        assert bindings.get_groups()[0].scope == "_global"
+
+    def test_a_file_without_groups_yields_unnamed_ones(
         self, write_bindings: WriteBindings
     ) -> None:
         bindings = CustomBindings(write_bindings(BINDINGS))
 
-        assert bindings.get_row_map()["quit"] == 1
+        assert all(group.name == "" for group in bindings.get_groups())
 
-    def test_a_missing_row_defaults_to_zero(
+    def test_every_binding_reaches_exactly_one_group(
         self, write_bindings: WriteBindings
     ) -> None:
-        bindings = CustomBindings(write_bindings(BINDINGS))
+        # A binding that no group claims is invisible in the footer while
+        # its key still works, which is the hardest shape to notice.
+        bindings = CustomBindings(write_bindings(GROUPED))
+        grouped = [
+            action
+            for group in bindings.get_groups()
+            for action in actions(group.bindings)
+        ]
 
-        assert bindings.get_row_map()["tasks_tab_add"] == 0
-
-    def test_the_screen_row_map_prefixes_the_globals(
-        self, write_bindings: WriteBindings
-    ) -> None:
-        bindings = CustomBindings(write_bindings(BINDINGS))
-
-        assert "app.quit" in bindings.get_screen_row_map()
-
-    def test_the_screen_row_map_leaves_tab_actions_alone(
-        self, write_bindings: WriteBindings
-    ) -> None:
-        bindings = CustomBindings(write_bindings(BINDINGS))
-
-        assert "tasks_tab_add" in bindings.get_screen_row_map()
-
-    def test_the_row_map_keys_match_the_binding_actions(
-        self, write_bindings: WriteBindings
-    ) -> None:
-        # The footer looks its rows up by action name. If the two disagree
-        # about the app. prefix, every global silently loses its row.
-        bindings = CustomBindings(write_bindings(BINDINGS))
-        row_map = bindings.get_screen_row_map()
-
-        for action in actions(bindings.get_screen_bindings()):
-            assert action in row_map
+        assert sorted(grouped) == sorted(actions(bindings.get_bindings()))
 
 
 class TestHandleCheckAction:
@@ -356,7 +438,7 @@ class TestHandleCheckAction:
 
         assert bindings.handle_check_action("toggle_dark", (), "tasks_tab")
 
-    def test_a_global_action_passes_in_any_group(
+    def test_a_global_action_passes_in_any_scope(
         self, write_bindings: WriteBindings
     ) -> None:
         bindings = CustomBindings(write_bindings(BINDINGS))
@@ -408,31 +490,30 @@ class TestSilentPathsAreReported:
                     action: quit
             """))
 
-        assert "Skipping a binding in group '_global'" in caplog.text
+        assert "Skipping a binding in scope '_global'" in caplog.text
         assert "description" in caplog.text
 
     def test_a_duplicate_action_is_reported(
         self, write_bindings: WriteBindings, caplog: pytest.LogCaptureFixture
     ) -> None:
-        # Only groups that do not prefix can collide, so this is a global and
-        # a screen claiming the same name. The second overwrites the first
-        # one's footer row.
+        # Only scopes that do not prefix can collide, so this is a global and
+        # a screen claiming the same name. The footer matches its rows by
+        # action, so the second declaration never renders a key of its own.
         with caplog.at_level(logging.WARNING):
             bindings = CustomBindings(write_bindings("""
                 _global:
                   - key: escape
                     action: cancel
                     description: Cancel
-                    row: 0
                 add_screen:
                   - key: q
                     action: cancel
                     description: Also cancel
-                    row: 1
             """))
 
         assert "declared more than once" in caplog.text
-        assert bindings.get_row_map()["cancel"] == 1  # the last writer wins
+        assert "_global, add_screen" in caplog.text
+        assert len(bindings.get_groups()) == 2
 
     def test_an_unknown_tab_name_is_reported(
         self, write_bindings: WriteBindings, caplog: pytest.LogCaptureFixture
@@ -443,7 +524,7 @@ class TestSilentPathsAreReported:
             result = bindings.get_bindings(tab_name="no_such_tab")
 
         assert actions(result) == ["quit"]
-        assert "No binding group" in caplog.text
+        assert "No binding scope" in caplog.text
 
     def test_an_unknown_screen_name_is_reported(
         self, write_bindings: WriteBindings, caplog: pytest.LogCaptureFixture
@@ -453,7 +534,7 @@ class TestSilentPathsAreReported:
         with caplog.at_level(logging.WARNING):
             bindings.get_screen_bindings("no_such_screen")
 
-        assert "No binding group" in caplog.text
+        assert "No binding scope" in caplog.text
 
     def test_a_known_name_is_silent(
         self, write_bindings: WriteBindings, caplog: pytest.LogCaptureFixture

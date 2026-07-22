@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] – 2026-07-22
+
+### Added
+
+- `tui/binding_groups.py`: `BindingGroup`, the labelled row of shortcuts that the footer and the help overlay both render from, plus `active_actions` to snapshot what is bound on a screen and `dispatch_name` to strip the `app.` prefix a Screen adds
+- `CustomBindings.get_groups`, returning every declared group in the order the YAML file declares it. It replaces both row maps, and the defect they invited disappears with them: there is no longer a pair of calls that can be mismatched
+- A `group` entry in the binding YAML. A scope may now hold groups, single bindings, or both; consecutive single bindings share one unlabelled row. Grouping is optional and adds no ceremony where it is not wanted
+- `tui/help_screen.py`: `HelpScreen`, the overlay section 1.8 of the style guide asks for - every shortcut, grouped, with a fuzzy search over them and a `ctrl+t` toggle between all bindings and the ones currently active. Matching uses Textual's own `Matcher` rather than a hand-written one
+- `tui/help_rows.py`: the filtering and row order behind the overlay, testable without an application
+- `tui/custom_widgets/footer_rows.py`: the footer's arithmetic - label column width, key width and wrapping - split out so it can be tested without an application and so `multiline_footer.py` stays inside the file-size limit
+- The first tests for `MultiLineFooter`, which had none: row order, separator count, label alignment, wrapping at a narrow width, and that clicking a key still runs its action
+
+### Changed
+
+- **Breaking.** The `row` field is gone, and with it `CustomBindings.get_row_map`, `get_screen_row_map` and the `row_map` parameter of `MultiLineFooter`. A group is now one row, so a second way to assign rows could only contradict the first
+- **Breaking.** `CustomBindings.sorted_by_key` is gone, along with the alphabetical sorting it enabled. The order of the YAML file is now the order of the footer, without exception
+- **Breaking.** `MultiLineFooter` no longer takes `auto_wrap`. Passing `groups` selects the grouped layout; omitting it wraps on width, which is what the old default did
+- **Breaking.** `handle_check_action`'s keyword argument `active_group` is now `active_scope`. The word "group" now means a footer row throughout, and what it used to mean - a top-level key of the YAML file - is called a scope
+- The footer prints group labels in a left column of shared width, keys separated by ` · `. A group too wide to fit wraps onto continuation rows whose label cell stays blank, so the keys align under the keys rather than under the label
+- The command palette key's width is now reserved, so the last row can no longer wrap into the space it is docked in
+- Text fields are read strictly: a `key`, `action` or `description` that YAML resolved to a boolean is dropped with a warning naming the fix, instead of rendering `False` as a label
+- Widths are measured in terminal cells rather than characters, so a CJK label no longer pushes the footer out of alignment
+
 ## [0.2.0] – 2026-07-19
 
 ### Added

@@ -49,7 +49,7 @@ Noticed while fixing the above, deliberately left alone to keep that change focu
 Noticed while writing its tests, deliberately left alone to keep that change focused.
 
 - [x] A binding missing `key`, `action` or `description` is dropped silently. Nothing is logged, so a typo in `bindings.yaml` costs a shortcut and says nothing.
-- [x] Two groups declaring the same action name both land in `action_to_groups`, but `action_row_map` keeps only the last one – the earlier binding silently moves to the other footer row.
+- [x] Two scopes declaring the same action name both land in `action_to_scopes`. The row map that used to lose one of them is gone in 0.3.0; the footer now matches by action and renders the first declaration, and the warning names both scopes.
 - [x] `get_bindings` with a `tab_name` or `screen_name` that matches no group returns just the globals instead of complaining, so a typo looks like a tab with no shortcuts.
 - [x] `show`, `priority` and `system` are read with `bool(...)`, so the YAML string `"false"` is `True`. Only an unquoted `false` behaves as written.
 - [x] `_parse_key_display` overrides an explicitly declared `key_display` for function keys, and returns `None` rather than the key when neither applies, contrary to what its docstring said.
@@ -68,10 +68,10 @@ Noticed while writing its tests, deliberately left alone to keep that change foc
 
 Genuine gaps against ratada, ordered by usefulness. Everything here is something Textual does not provide, so it is work that belongs in the toolkit rather than in each application.
 
-- [ ] Help overlay with fuzzy search over the bindings, grouped by section. Section 1.6 of the style guide requires one in every TUI, and termplate is waiting on it.
+- [x] Help overlay with fuzzy search over the bindings, grouped by section. Shipped in 0.3.0 as `HelpScreen`, reading the same `BindingGroup` objects as the footer.
 - [ ] The modal set beyond the existing `QuestionScreen`, which only covers confirmation: text input, single select, multi select, number input and a plain message modal. The underlying widgets exist in Textual; what is missing is the ready-made prompt that returns a value.
 - [ ] Calendar date picker, plus the date-range and month variants. Also required by section 1.6.
-- [ ] Fuzzy finder over arbitrary lists. Textual ships `textual.fuzzy.Matcher`, but it is wired into the command palette rather than reusable as a generic picker.
+- [ ] Fuzzy finder over arbitrary lists. `HelpScreen` now shows the shape - an `Input` driving an `OptionList`, filtered through `textual.fuzzy.Matcher` - so the remaining work is lifting that out of the help overlay into a widget that takes any list.
 - [ ] Schema-driven form modal: several fields of mixed type in one dialog, returning a filled structure. `CustomBindings` already shows that the declarative-schema approach fits this codebase.
 - [ ] Autocomplete dropdown for text fields.
 - [ ] Colour picker and swatch picker, and a numeric slider or stepper.

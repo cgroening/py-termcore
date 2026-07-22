@@ -40,10 +40,18 @@ class TestTheStarExportCarriesOnlyTheApi:
             "Database", "Condition", "SQLComparisonOperator",
             "ThemeLoader", "CustomBindings", "QuestionScreen",
             "AppStateStorage", "MultiLineFooter",
+            "BindingGroup", "HelpScreen", "active_actions",
             "next_index", "clamped_index", "cell_width",
             "str_with_fixed_width", "DateFormat", "print_error",
         ):
             assert hasattr(termcore, name), name
+
+    def test_the_layout_helpers_stay_out_of_the_namespace(self) -> None:
+        # They are the arithmetic behind two widgets, not an API an
+        # application consumes; exporting them would widen the surface for
+        # nobody's benefit.
+        for name in ("FooterLayout", "build_rows", "hint_width"):
+            assert not hasattr(termcore, name), name
 
 
 class TestEveryModuleDeclaresItsApi:

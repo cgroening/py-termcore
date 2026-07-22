@@ -63,7 +63,7 @@ How to run it:
 `tui/question_screen.py` plus the four under `tui/custom_widgets/`: five modules, no tests, and the widgets are what a consumer sees first.
 
 - [ ] `question_screen.py`: `ButtonColor` and the dismissal contract.
-- [ ] `multiline_footer.py`: the largest of the four. Check `row_map` handling against a key that no binding declares, and the wrapping behaviour at a narrow width.
+- [x] `multiline_footer.py`: gained its first tests with the 0.3.0 grouping work, covering row order, separators, label alignment, wrapping at a narrow width and that a click on a key still runs its action. The arithmetic now sits in `footer_rows.py` and is tested without an app.
 - [ ] `custom_data_table.py`: `flexible_columns` is now per instance; check the resize arithmetic against a table narrower than its fixed columns.
 - [ ] `custom_checkbox.py` and `custom_selection.py`: both override rendering only; confirm nothing else is needed.
 - [ ] Tests for all five through `App.run_test()`.

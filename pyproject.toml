@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "termcore"
-version = "0.2.0"
+version = "0.3.0"
 description = "Terminal utilities for CLI, TUI, IO and general use"
 readme = "README.md"
 license = { text = "MIT" }
@@ -125,8 +125,9 @@ max-args = 3  # style guide: keep parameter count at 3 or below
 # here is the product, not a stray debug statement.
 "termcore/cli/output.py" = ["T201"]
 # Textual reads annotations at runtime, so a type-only import moved into
-# a TYPE_CHECKING block stops resolving (style guide 3.2.9).
-"termcore/tui/**" = ["TC002", "TC003"]
+# a TYPE_CHECKING block stops resolving (style guide 3.2.9). TC001 is the
+# same rule for this package's own types, such as BindingGroup.
+"termcore/tui/**" = ["TC001", "TC002", "TC003"]
 "tests/**" = [
     "S101",    # assert is the point of a test
     "D",       # no docstrings required in tests
@@ -162,7 +163,7 @@ branch = true
 show_missing = true
 # Holds the current level. Coverage that enforces nothing is decoration.
 # Raised with every module that gains tests (see TODO.md, section "Tests").
-fail_under = 73
+fail_under = 81
 
 [tool.pyright]
 # Section 3.2.5 of the style guide asks for strict. Worth knowing what that

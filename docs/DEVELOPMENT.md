@@ -37,6 +37,7 @@ termcore/
     question_screen.py  QuestionScreen, a modal yes/no dialog, and ButtonColor
     themes/             the sixteen bundled themes, one directory each
     custom_widgets/
+      footer_rows.py       Row layout for the footer: columns, wrapping
       multiline_footer.py  MultiLineFooter: a Footer that spans several rows
       custom_data_table.py CustomDataTable: a DataTable with stretching columns
       custom_checkbox.py   CustomCheckbox: a check mark instead of an X
@@ -63,7 +64,7 @@ Section 1.2.7 of the style guide asks that an existing solution be found before 
 - **Fixed-width output.** `str_with_fixed_width` truncates or pads to an exact number of terminal cells, and `cell_width` measures. Never use `len()` for a column: a CJK glyph is two cells wide and a combining mark is none, so counting characters is what pushes a column out of alignment.
 - **List navigation.** `next_index` wraps at both ends, `clamped_index` stops at them. Section 1.6 requires wrapping selection lists, and both return 0 for an empty list rather than raising.
 - **Themes.** `ThemeLoader` finds, registers and switches them. A theme is identified by the `name` in its `theme.py`, never by its directory.
-- **Key bindings.** `CustomBindings` reads them from YAML. `get_bindings` is for the App, `get_screen_bindings` for a Screen, and the matching `get_row_map` or `get_screen_row_map` feeds `MultiLineFooter`. Pairing the wrong two silently loses the footer row of every global binding.
+- **Key bindings.** `CustomBindings` reads them from YAML. `get_bindings` is for the App, `get_screen_bindings` for a Screen, and `get_groups` feeds both `MultiLineFooter` and `HelpScreen`. Match bindings by action through `dispatch_name`, never by raw string: a Screen renames a global action to `app.<action>`, and comparing the two forms directly silently drops every global binding.
 - **Storage.** `Database` for SQLite, `AppStateStorage` for a small JSON state file. Neither wants a wrapper around it.
 - **New exceptions** go into `termcore/io/errors.py` or a sibling `errors` module, deriving from `Exception`, never a bare `raise Exception(...)`.
 - **Text wrapping** is `linewrap`; **version lookup** is `get_version`; **logging setup** is `setup_logging`, which an application calls once.
