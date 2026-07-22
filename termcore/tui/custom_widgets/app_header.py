@@ -22,7 +22,9 @@ Usage:
 from collections.abc import Sequence
 
 from textual.content import Content
+from textual.message import Message
 from textual.reactive import reactive
+from textual.style import Style
 from textual.widgets import Static
 
 from termcore.tui.custom_widgets.tab_rows import (
@@ -65,6 +67,21 @@ class AppHeader(Static):
 
     ALLOW_SELECT = False
 
+    class TabSelected(Message):
+        """
+        Posted when a tab in the bar is clicked.
+
+        Attributes
+        ----------
+        tab_id : str
+            The id of the tab that was clicked.
+        """
+
+        def __init__(self, tab_id: str) -> None:
+            """Records which tab was clicked."""
+            super().__init__()
+            self.tab_id = tab_id
+
     DEFAULT_CSS: str = """
     AppHeader {
         dock: top;
@@ -73,6 +90,15 @@ class AppHeader(Static):
         padding: 1 0;
         background: $panel;
         text-wrap: nowrap;
+
+        /* A clickable span is a link to Textual, and it would otherwise be
+           underlined and recoloured - which is exactly the dimming the tabs
+           carry their meaning in. The hover keeps the affordance. */
+        link-style: none;
+        link-color: $foreground-darken-3;
+        link-style-hover: bold;
+        link-color-hover: $foreground;
+        link-background-hover: transparent;
     }
     """
 
@@ -138,9 +164,34 @@ class AppHeader(Static):
         return content
 
     def _tab(self, tab: HeaderTab) -> Content:
-        """Renders one tab, bold when it is the active one."""
+        """Renders one tab, bold when active and clickable when not."""
         # Brightness and weight carry the distinction; there is no reverse
         # video and no background, so the bar stays quiet.
-        style = "bold" if tab.id == self.active else _DIMMED
+        if tab.id == self.active:
+            # Deliberately not clickable. Textual restyles anything carrying
+            # a click with its link colour, which would flatten the active
+            # tab to the same grey as the rest - and a click on the tab one
+            # is already on has nothing to do anyway.
+            return Content.styled(tab_token(tab), "bold")
 
-        return Content.styled(tab_token(tab), style)
+        # The click is carried in the span's metadata rather than measured
+        # from the pointer's column, so Textual does the hit testing and the
+        # wrapped rows need no arithmetic of their own.
+        return Content.styled(tab_token(tab), _DIMMED).stylize(
+            Style.from_meta({"@click": f"select_tab({tab.id!r})"})
+        )
+
+    def action_select_tab(self, tab_id: str) -> None:
+        """
+        Announces that a tab was clicked.
+
+        The header does not switch anything itself - it does not own the
+        content. It says which tab was asked for and leaves the decision to
+        whoever mounted it.
+
+        Parameters
+        ----------
+        tab_id : str
+            The id of the clicked tab.
+        """
+        self.post_message(self.TabSelected(tab_id))

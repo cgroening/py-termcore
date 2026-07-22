@@ -49,7 +49,8 @@ class TestClampedMovement:
 
 
 class TestEmptyList:
-    """Style guide 1.6: an empty list yields index 0.
+    """
+    Style guide 1.6: an empty list yields index 0.
 
     This used to raise ZeroDivisionError from the modulo, which meant every
     caller had to guard the empty case itself.

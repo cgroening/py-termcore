@@ -67,7 +67,8 @@ Section 1.2.7 of the style guide asks that an existing solution be found before 
 - **Key bindings.** `CustomBindings` reads them from YAML. `get_bindings` is for the App, `get_screen_bindings` for a Screen, and `get_groups` feeds both `MultiLineFooter` and `HelpScreen`. Match bindings by action through `dispatch_name`, never by raw string: a Screen renames a global action to `app.<action>`, and comparing the two forms directly silently drops every global binding.
 - **Storage.** `Database` for SQLite, `AppStateStorage` for a small JSON state file. Neither wants a wrapper around it.
 - **New exceptions** go into `termcore/io/errors.py` or a sibling `errors` module, deriving from `Exception`, never a bare `raise Exception(...)`.
-- **Text wrapping** is `linewrap`; **version lookup** is `get_version`; **logging setup** is `setup_logging`, which an application calls once.
+- **Writing a file that must not be lost.** `Textfile.write_atomic` writes to a sibling temporary file, syncs it and renames it over the target, so a crash leaves either the old content or the new one. Plain `write` truncates first: for anything rewritten whole - a store, a state file - that turns an interrupted write into total loss, not a lost last change.
+- **Text wrapping** is `linewrap`; **version lookup** is `get_version`; **logging setup** is `setup_logging`, which an application calls once and which takes a `log_dir` so an app that resolves its own paths keeps that in one place.
 
 ## Textual behaviour worth knowing
 

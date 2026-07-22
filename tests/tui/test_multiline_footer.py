@@ -1,4 +1,5 @@
-"""Tests for the multi-line footer as it actually renders.
+"""
+Tests for the multi-line footer as it actually renders.
 
 The widget had no tests at all before grouping arrived, so the rules it has
 always followed are pinned here alongside the new ones. Everything runs

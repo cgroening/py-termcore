@@ -1,4 +1,5 @@
-"""Tests for loading key bindings from YAML and composing them per context.
+"""
+Tests for loading key bindings from YAML and composing them per context.
 
 The scope name is a contract, not a label: it decides whether an action is
 prefixed, when it is visible, and which object Textual dispatches it on. None
@@ -45,7 +46,8 @@ def actions(bindings: Sequence[object]) -> list[str]:
 
 
 class TestBindingsAreLoadedPerInstance:
-    """The registry used to live in class attributes shared by every instance.
+    """
+    The registry used to live in class attributes shared by every instance.
 
     A second CustomBindings in one process inherited the first one's groups
     and appended its own on top, so every binding appeared twice and every
@@ -329,7 +331,8 @@ def group_names(bindings: CustomBindings) -> list[str]:
 
 
 class TestGetGroups:
-    """The order of these groups is the order of the footer rows.
+    """
+    The order of these groups is the order of the footer rows.
 
     Nothing sorts them on the way out, so moving a group in the file is the
     only way to move its row - and a test is the only thing that keeps that
@@ -474,7 +477,8 @@ class TestHandleCheckAction:
 
 
 class TestSilentPathsAreReported:
-    """Each of these used to happen without a word.
+    """
+    Each of these used to happen without a word.
 
     A shortcut that quietly does not exist is the hardest kind of defect to
     find, because nothing about the running app points at the YAML file.
@@ -657,7 +661,8 @@ class TestKeyDisplayPrecedence:
 
 
 class TestScopeTitles:
-    """The display names of the scopes live in a second file.
+    """
+    The display names of the scopes live in a second file.
 
     A second file can go stale in both directions - a scope with no title, a
     title for a scope that no longer exists - and neither shows up while the
@@ -752,7 +757,8 @@ class TestScopeTitles:
 
 
 class TestTabBindings:
-    """Declaring a key is what makes a scope a tab.
+    """
+    Declaring a key is what makes a scope a tab.
 
     The key lives in the scopes file and nowhere else, so the header and the
     shortcut that actually fires cannot disagree about it.

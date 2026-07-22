@@ -1,4 +1,5 @@
-"""Guards the size and shape of what `from termcore import *` hands out.
+"""
+Guards the size and shape of what `from termcore import *` hands out.
 
 Every module re-exports through `import *`, so a module without an `__all__`
 re-exports its own imports too. That is not theoretical: `util/datetime.py`

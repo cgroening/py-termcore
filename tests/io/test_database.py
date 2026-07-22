@@ -1,4 +1,5 @@
-"""Tests for the SQLite wrapper: statement building, safety and lifecycle.
+"""
+Tests for the SQLite wrapper: statement building, safety and lifecycle.
 
 The point of the builder is that a caller never writes SQL, which means the
 caller also never gets to check it. Two properties therefore carry the whole
@@ -393,7 +394,8 @@ class TestRemove:
 
 
 class TestIdentifiersAreCheckedAgainstTheSchema:
-    """Identifiers cannot be parameters, so they are checked instead.
+    """
+    Identifiers cannot be parameters, so they are checked instead.
 
     Each payload below is one that reaches the database as SQL when the
     names are interpolated unchecked.

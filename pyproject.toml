@@ -130,7 +130,7 @@ max-args = 3  # style guide: keep parameter count at 3 or below
 "termcore/tui/**" = ["TC001", "TC002", "TC003"]
 "tests/**" = [
     "S101",    # assert is the point of a test
-    "D",       # no docstrings required in tests
+    "D1",      # no docstrings required in tests
     "ANN",     # no annotations required in tests
     "PLR2004", # magic values are fine as expected test values
     "SLF001",  # tests legitimately reach into private members

@@ -1,4 +1,5 @@
-"""Tests for the string formatting helpers.
+"""
+Tests for the string formatting helpers.
 
 `str_with_fixed_width` promises exactly `width` terminal cells, which is the
 whole reason it exists - a fixed-width column that is not fixed-width breaks
