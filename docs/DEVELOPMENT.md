@@ -69,6 +69,37 @@ Section 1.2.7 of the style guide asks that an existing solution be found before 
 - **New exceptions** go into `termcore/io/errors.py` or a sibling `errors` module, deriving from `Exception`, never a bare `raise Exception(...)`.
 - **Text wrapping** is `linewrap`; **version lookup** is `get_version`; **logging setup** is `setup_logging`, which an application calls once.
 
+## Textual behaviour worth knowing
+
+### A RuntimeWarning about an un-awaited coroutine on exit
+
+Quitting an application sometimes prints:
+
+```text
+textual/drivers/linux_driver.py:397: RuntimeWarning: coroutine
+'MessagePump._post_message' was never awaited
+  self._app.call_later(
+```
+
+The line it names is not where the coroutine was created. `linux_driver.py:397` is `self._app.call_later(...)` in the input thread's `except BaseException:` branch, and that path calls the synchronous `post_message`, which creates no coroutine at all. The hint in the message - "Enable tracemalloc to get the object allocation traceback" - says as much: what is shown is the frame that happened to be running when the garbage collector finalised an orphan.
+
+The orphan comes from one of three places in the driver, all of the same shape:
+
+```python
+asyncio.run_coroutine_threadsafe(
+    self._app._post_message(event),   # the coroutine is created here...
+    loop=loop,                        # ...and handed to a loop that may be closed
+)
+```
+
+They are `linux_driver.py:232` inside `send_size_event`, which is registered as the SIGWINCH handler, `linux_driver.py:295` for `SignalResume` after a SIGTSTP, and `driver.py:74` in `Driver.send_message`. Python evaluates the argument first, so the coroutine object exists before `run_coroutine_threadsafe` gets the chance to refuse it. Once the loop is closed that call raises and the coroutine is dropped un-awaited.
+
+Hence "sometimes": it needs a terminal event in the sliver between the loop closing and the process ending. Leaving the alternate screen restores the terminal's previous size, which frequently raises SIGWINCH by itself, so whether it happens depends on the terminal, on timing, and on whether the window was resized.
+
+A second failure hides in the same message. That line 397 runs at all means the input thread died with an exception during teardown; its attempt to report that through `call_later` returns `False` because the message pump is already closing, so the panic is swallowed.
+
+None of it is ours. Neither termcore nor termplate has a thread, a worker or a signal handler, and this driver only runs in a real terminal - tests use `HeadlessDriver`, which is why neither suite ever sees it although both set `filterwarnings = ["error"]`. There is no relevant entry in Textual's changelog between 8.1.1 and 8.2.8, so upgrading does not help. It is printed after the application has exited and is left alone deliberately: a warnings filter in the entry point would swallow the same message when it one day comes from our own code.
+
 ## Common commands
 
 ```zsh

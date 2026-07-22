@@ -154,3 +154,31 @@ class TestClearing:
             await pilot.pause()
 
             assert rendered(app) == "3 tasks"
+
+
+class TestTheDimmingIsReal:
+    """Checked on the rendered colour, not on the style string.
+
+    `info` first shipped with `$text-muted`, an `auto` colour that resolves
+    to white inside a Content style string - the opposite of dimmed, and
+    invisible to any test that only reads the style back.
+    """
+
+    async def test_the_standing_half_is_dimmed(self) -> None:
+        app = StatusApp()
+
+        async with app.run_test(size=(WIDTH, 8)) as pilot:
+            await pilot.pause()
+            bar = app.query_one(StatusBar)
+            bar.info = "3 tasks"
+            await pilot.pause()
+            segment = next(
+                seg
+                for seg in bar.render_lines(bar.region.size.region)[0]
+                if "3 tasks" in seg.text
+            )
+            colour = segment.style.color if segment.style else None
+            triplet = colour.triplet if colour is not None else None
+
+            assert triplet is not None
+            assert (triplet.red, triplet.green, triplet.blue) != (255, 255, 255)

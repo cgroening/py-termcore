@@ -174,3 +174,55 @@ class TestTabsCanChange:
 
             assert "[9] Only" in "\n".join(lines(app))
             assert "[1] Tasks" not in "\n".join(lines(app))
+
+
+def brightness(app: HeaderApp, token: str) -> int:
+    """Returns the rendered brightness of the segment carrying the token."""
+    header = app.query_one(AppHeader)
+    for row in header.render_lines(header.region.size.region):
+        for segment in row:
+            if token in segment.text:
+                colour = segment.style.color if segment.style else None
+                triplet = colour.triplet if colour is not None else None
+                assert triplet is not None, f"{token}: no colour"
+
+                return triplet.red + triplet.green + triplet.blue
+
+    raise AssertionError(f"{token}: not rendered")
+
+
+class TestTheDimmingIsReal:
+    """Checked on the rendered colour, not on the style string.
+
+    The bar first shipped with `$text-muted`, which reads like a dim grey but
+    is an `auto` colour: inside a Content style string it resolves to white,
+    so the inactive tabs came out brighter than the active one. A test on the
+    style string would have been perfectly green.
+    """
+
+    async def test_an_inactive_tab_is_darker_than_the_active_one(
+        self,
+    ) -> None:
+        app = HeaderApp(active="tasks_tab")
+
+        async with app.run_test(size=(90, 10)) as pilot:
+            await pilot.pause()
+
+            assert brightness(app, "[2] Done") < brightness(app, "[1] Tasks")
+
+    async def test_the_separator_is_dimmed_too(self) -> None:
+        app = HeaderApp(active="tasks_tab")
+
+        async with app.run_test(size=(90, 10)) as pilot:
+            await pilot.pause()
+
+            assert brightness(app, "│") < brightness(app, "[1] Tasks")
+
+    async def test_nothing_dimmed_renders_as_white(self) -> None:
+        # White is the specific way the broken variable failed.
+        app = HeaderApp(active="tasks_tab")
+
+        async with app.run_test(size=(90, 10)) as pilot:
+            await pilot.pause()
+
+            assert brightness(app, "[2] Done") < 255 * 3

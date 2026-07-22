@@ -30,6 +30,12 @@ __all__ = [
     "StatusBar",
 ]
 
+# A dimmed foreground. Deliberately not `$text-muted`: that is defined as
+# `auto 60%`, a colour blended against a background it never gets inside a
+# Content style string, where it silently falls back to white. Only
+# variables naming a real colour resolve here; in a stylesheet both do.
+_DIMMED = "$foreground-darken-3"
+
 
 class StatusBar(Static):
     """
@@ -82,7 +88,7 @@ class StatusBar(Static):
 
     def _redraw(self) -> None:
         """Renders both halves with the gap that separates them."""
-        content = Content.styled(self.info, "$text-muted")
+        content = Content.styled(self.info, _DIMMED)
         if self.message:
             content += Content(" " * self._gap())
             content += Content.styled(self.message, "$primary")

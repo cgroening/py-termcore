@@ -40,6 +40,12 @@ __all__ = [
     "HelpScreen",
 ]
 
+# A dimmed foreground. Deliberately not `$text-muted`: that is defined as
+# `auto 60%`, a colour blended against a background it never gets inside a
+# Content style string, where it silently falls back to white. Only
+# variables naming a real colour resolve here; in a stylesheet both do.
+_GROUP_STYLE = "bold $foreground-darken-3"
+
 _INDENT = "  "
 
 _COVERAGE_HINTS = {
@@ -197,7 +203,7 @@ class HelpScreen(ModalScreen[None]):
             # stay apart even where the indent alone is easy to miss.
             style = (
                 "bold $primary" if row.level == SCOPE_LEVEL
-                else "bold $text-muted"
+                else _GROUP_STYLE
             )
             label = row.label.upper() if row.level == SCOPE_LEVEL else row.label
 

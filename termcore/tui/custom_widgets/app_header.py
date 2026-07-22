@@ -40,6 +40,12 @@ __all__ = [
     "HeaderTab",
 ]
 
+# A dimmed foreground. Deliberately not `$text-muted`: that is defined as
+# `auto 60%`, a colour blended against a background it never gets inside a
+# Content style string, where it silently falls back to white. Only
+# variables naming a real colour resolve here; in a stylesheet both do.
+_DIMMED = "$foreground-darken-3"
+
 _FALLBACK_WIDTH = 80
 
 
@@ -126,7 +132,7 @@ class AppHeader(Static):
 
         for position, tab in enumerate(row.tabs):
             if position:
-                content += Content.styled(SEPARATOR, "$text-muted")
+                content += Content.styled(SEPARATOR, _DIMMED)
             content += self._tab(tab)
 
         return content
@@ -135,6 +141,6 @@ class AppHeader(Static):
         """Renders one tab, bold when it is the active one."""
         # Brightness and weight carry the distinction; there is no reverse
         # video and no background, so the bar stays quiet.
-        style = "bold" if tab.id == self.active else "$text-muted"
+        style = "bold" if tab.id == self.active else _DIMMED
 
         return Content.styled(tab_token(tab), style)

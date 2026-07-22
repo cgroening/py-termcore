@@ -317,3 +317,29 @@ class TestTwoLevels:
 
                 assert index is not None
                 assert not options.get_option_at_index(index).disabled
+
+
+class TestTheGroupHeadingIsDimmed:
+    """The inner heading shipped with `$text-muted` and rendered white.
+
+    An `auto` colour does not resolve inside a Content style string, so the
+    group heading was brighter than the entries it was meant to sit above.
+    """
+
+    async def test_a_group_heading_is_not_white(self) -> None:
+        app = NestedApp()
+
+        async with app.run_test(size=(80, 24)) as pilot:
+            await pilot.pause()
+            options = app.screen.query_one(OptionList)
+            segment = next(
+                seg
+                for row in options.render_lines(options.region.size.region)
+                for seg in row
+                if "Appearance" in seg.text
+            )
+            colour = segment.style.color if segment.style else None
+            triplet = colour.triplet if colour is not None else None
+
+            assert triplet is not None
+            assert (triplet.red, triplet.green, triplet.blue) != (255, 255, 255)
