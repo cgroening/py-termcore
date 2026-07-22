@@ -1,4 +1,5 @@
-"""Tests for theme discovery, registration, stylesheets and persistence.
+"""
+Tests for theme discovery, registration, stylesheets and persistence.
 
 The assertions run against a loader and a live Textual app rather than
 against the text of the theme modules. Every bug this module ever shipped was
@@ -59,7 +60,8 @@ def custom_loader(theme_root: Path) -> ThemeLoader:
 
 
 class TestThemeRegistryIsPerInstance:
-    """The registry used to be a class attribute shared by every loader.
+    """
+    The registry used to be a class attribute shared by every loader.
 
     A second app in the same process saw CUSTOM_CUSTOM_<name>, a third
     CUSTOM_CUSTOM_CUSTOM_<name>. One app per process hid it in production;
@@ -173,7 +175,8 @@ class TestRegistrationIsRepeatable:
 
 
 class TestThemeIdentityIsTheDeclaredName:
-    """A theme is its declared name plus a prefix, never its folder name.
+    """
+    A theme is its declared name plus a prefix, never its folder name.
 
     Themes used to be stored under the folder name but have their CSS looked
     up by the theme name, so a folder that disagreed with its theme.py
@@ -540,7 +543,8 @@ class TestThemePersistence:
 
 
 class TestABrokenStylesheetDoesNotKillTheApp:
-    """reparse() used to run unguarded, so invalid TCSS crashed the app.
+    """
+    reparse() used to run unguarded, so invalid TCSS crashed the app.
 
     A library has no business taking the whole application down because a
     theme it was handed will not parse.

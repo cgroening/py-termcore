@@ -1,4 +1,5 @@
-"""Tests for what the help overlay lists.
+"""
+Tests for what the help overlay lists.
 
 The overlay and the footer read the same groups but lay them out on different
 axes, so the rules worth pinning are the ones where they differ: the overlay

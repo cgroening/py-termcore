@@ -1,4 +1,5 @@
-"""Tests for the header as it actually renders.
+"""
+Tests for the header as it actually renders.
 
 The packing is pinned in test_tab_rows; what is left for here is what only a
 running app shows: that the widget grows with its rows instead of clipping
@@ -42,6 +43,15 @@ def content(app: HeaderApp) -> Content:
     assert isinstance(visual, Content)
 
     return visual
+
+
+def click_actions(app: HeaderApp) -> set[str]:
+    """Returns the click action of every span that carries one."""
+    return {
+        span.style.meta["@click"]
+        for span in content(app).spans
+        if not isinstance(span.style, str) and "@click" in span.style.meta
+    }
 
 
 def styles_at(app: HeaderApp, token: str) -> set[str]:
@@ -192,7 +202,8 @@ def brightness(app: HeaderApp, token: str) -> int:
 
 
 class TestTheDimmingIsReal:
-    """Checked on the rendered colour, not on the style string.
+    """
+    Checked on the rendered colour, not on the style string.
 
     The bar first shipped with `$text-muted`, which reads like a dim grey but
     is an `auto` colour: inside a Content style string it resolves to white,
@@ -226,3 +237,77 @@ class TestTheDimmingIsReal:
             await pilot.pause()
 
             assert brightness(app, "[2] Done") < 255 * 3
+
+
+class TestClickingATab:
+    """
+    The labels are clickable, and the header stays out of the decision.
+
+    A click posts a message rather than switching anything: the header does
+    not own the content, so it says which tab was asked for and lets the
+    screen that mounted it decide what that means.
+    """
+
+    async def test_clicking_a_label_posts_its_id(self) -> None:
+        seen: list[str] = []
+
+        class ListeningApp(HeaderApp):
+            def on_app_header_tab_selected(
+                self, event: AppHeader.TabSelected
+            ) -> None:
+                seen.append(event.tab_id)
+
+        app = ListeningApp()
+
+        async with app.run_test(size=(90, 10)) as pilot:
+            await pilot.pause()
+            column = str(content(app)).index("[2] Done") + 2
+
+            # Row 1: the widget pads itself by one line at the top.
+            await pilot.click(AppHeader, offset=(column, 1))
+            await pilot.pause()
+
+            assert seen == ["done_tab"]
+
+    async def test_the_action_carries_the_id(self) -> None:
+        app = HeaderApp(active="tasks_tab")
+
+        async with app.run_test(size=(90, 10)) as pilot:
+            await pilot.pause()
+
+            assert "select_tab('notes_tab')" in click_actions(app)
+
+    async def test_every_inactive_tab_is_clickable(self) -> None:
+        app = HeaderApp(active="tasks_tab")
+
+        async with app.run_test(size=(90, 10)) as pilot:
+            await pilot.pause()
+            actions = click_actions(app)
+
+            for tab in TABS:
+                if tab.id != "tasks_tab":
+                    assert f"select_tab({tab.id!r})" in actions
+
+    async def test_the_active_tab_is_not_clickable(self) -> None:
+        # Textual restyles anything clickable with its link colour, which
+        # would flatten the active tab to the same grey as the others. A
+        # click on the tab one is already on has nothing to do anyway.
+        app = HeaderApp(active="tasks_tab")
+
+        async with app.run_test(size=(90, 10)) as pilot:
+            await pilot.pause()
+
+            assert "select_tab('tasks_tab')" not in click_actions(app)
+
+    async def test_clicking_never_underlines_the_tabs(self) -> None:
+        # The link style is switched off in the widget's CSS; left on, the
+        # underline and the link colour would replace the dimming that tells
+        # the active tab from the rest.
+        app = HeaderApp(active="tasks_tab")
+
+        async with app.run_test(size=(90, 10)) as pilot:
+            await pilot.pause()
+            header = app.query_one(AppHeader)
+
+            for segment in header.render_lines(header.region.size.region)[1]:
+                assert segment.style is None or not segment.style.underline

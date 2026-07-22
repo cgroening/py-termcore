@@ -1,4 +1,5 @@
-"""Tests for the arithmetic behind the header's tab bar.
+"""
+Tests for the arithmetic behind the header's tab bar.
 
 The rules pinned here are the ones a reader would take for cosmetics until
 they break: the brand column that every row is charged for, the separator

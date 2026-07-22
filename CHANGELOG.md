@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `Textfile.write_atomic`, which writes through a synced temporary file and a rename. `AppStateStorage`, `ThemeLoader` and any consumer rewriting a file whole now keep their old content when a write is interrupted; a plain write truncates first, so a crash between truncating and writing loses everything rather than the last change
+- `setup_logging` takes a `log_dir`, so an application that resolves its own paths does not have a second resolver behind its back. Its default now follows `XDG_STATE_HOME` instead of hard-coding `~/.local/state`
+- `AppHeader` posts `TabSelected` when a tab label is clicked. The header does not switch anything itself - it does not own the content - and only inactive tabs carry the click, because Textual restyles anything clickable with its link colour and that would flatten the active tab to the same grey as the rest
+
 - `tui/binding_groups.py`: `BindingGroup`, the labelled row of shortcuts that the footer and the help overlay both render from, plus `active_actions` to snapshot what is bound on a screen and `dispatch_name` to strip the `app.` prefix a Screen adds
 - `CustomBindings.get_groups`, returning every declared group in the order the YAML file declares it. It replaces both row maps, and the defect they invited disappears with them: there is no longer a pair of calls that can be mismatched
 - A `group` entry in the binding YAML. A scope may now hold groups, single bindings, or both; consecutive single bindings share one unlabelled row. Grouping is optional and adds no ceremony where it is not wanted
@@ -33,6 +37,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Breaking.** `HelpScope` is now `HelpCoverage` and `HelpRequest.scope` is `coverage`. With the overlay grouping by scope, the old name meant two things at once, which is exactly the ambiguity the group/scope split had just removed
 - The footer prints group labels in a left column of shared width, keys separated by ` · `. A group too wide to fit wraps onto continuation rows whose label cell stays blank, so the keys align under the keys rather than under the label
 - The command palette key's width is now reserved, so the last row can no longer wrap into the space it is docked in
+- `setup_logging` installs a file handler only, and now says so. Its docstring claimed "file and console logging" while installing neither a console handler nor wanting one: a console handler writes into the terminal the application is drawing on
+- The docstring layout rule of style guide 3.2.4 is enforced in the test suite as well. `tests/**` ignored the whole `D` group, so the one rule that is about layout rather than about requiring a docstring was off there too; the ignore is now `D1`
 - Text fields are read strictly: a `key`, `action` or `description` that YAML resolved to a boolean is dropped with a warning naming the fix, instead of rendering `False` as a label
 - Widths are measured in terminal cells rather than characters, so a CJK label no longer pushes the footer out of alignment
 

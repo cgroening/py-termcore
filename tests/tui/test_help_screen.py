@@ -1,4 +1,5 @@
-"""Tests for the help overlay as it runs.
+"""
+Tests for the help overlay as it runs.
 
 The overlay is a search field that drives a list while never giving up the
 focus, and a scope switch that changes what the list is drawn from. Neither
@@ -320,7 +321,8 @@ class TestTwoLevels:
 
 
 class TestTheGroupHeadingIsDimmed:
-    """The inner heading shipped with `$text-muted` and rendered white.
+    """
+    The inner heading shipped with `$text-muted` and rendered white.
 
     An `auto` colour does not resolve inside a Content style string, so the
     group heading was brighter than the entries it was meant to sit above.

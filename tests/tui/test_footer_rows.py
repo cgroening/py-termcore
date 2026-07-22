@@ -1,4 +1,5 @@
-"""Tests for the arithmetic behind the multi-line footer.
+"""
+Tests for the arithmetic behind the multi-line footer.
 
 Layout defects are the quiet kind: a column that is one cell too narrow or a
 group that silently renders no row looks like a design choice rather than a

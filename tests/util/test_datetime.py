@@ -1,4 +1,5 @@
-"""Tests for the timestamp and date-string conversions.
+"""
+Tests for the timestamp and date-string conversions.
 
 Every test runs under a pinned TZ. These functions convert through the local
 time zone by design, so without pinning it the suite would assert one thing
@@ -93,7 +94,8 @@ class TestRoundTrip:
 
 
 class TestDateDiff:
-    """Counted in local calendar days, not in 86400-second blocks.
+    """
+    Counted in local calendar days, not in 86400-second blocks.
 
     Dividing by 86400 reported -1 days for a difference of one second in the
     wrong direction, and was off by one across every daylight saving switch.

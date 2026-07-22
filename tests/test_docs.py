@@ -1,4 +1,5 @@
-"""Keeps the project documentation honest.
+"""
+Keeps the project documentation honest.
 
 `docs/DEVELOPMENT.md` and `docs/CLEAN-UP.md` point at modules, commands and
 fixtures by name. A path that no longer exists is not a typo, it is an
@@ -132,7 +133,8 @@ class TestDocumentedPathsExist:
 
 
 class TestRelativeLinksResolve:
-    """Links are the other way a document points at a file.
+    """
+    Links are the other way a document points at a file.
 
     They carry no backticks, so the path checks above never see them, and
     they break as soon as either end of the link moves.

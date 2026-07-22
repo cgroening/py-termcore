@@ -11,6 +11,8 @@ from typing import cast
 from textual.app import App
 from textual.theme import Theme
 
+from termcore.io.textfile import Textfile
+
 __all__ = [
     "DEFAULT_CUSTOM_THEME_PREFIX",
     "DEFAULT_TERMCORE_THEME_PREFIX",

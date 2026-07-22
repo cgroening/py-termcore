@@ -1,4 +1,5 @@
-"""Tests for the status bar as it actually renders.
+"""
+Tests for the status bar as it actually renders.
 
 The two halves are different things and the tests keep them apart: `info`
 stands, `message` passes. What only a running app shows is the spacing
@@ -157,7 +158,8 @@ class TestClearing:
 
 
 class TestTheDimmingIsReal:
-    """Checked on the rendered colour, not on the style string.
+    """
+    Checked on the rendered colour, not on the style string.
 
     `info` first shipped with `$text-muted`, an `auto` colour that resolves
     to white inside a Content style string - the opposite of dimmed, and

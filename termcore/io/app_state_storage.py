@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import cast
 
 from termcore.io.errors import StateFileError
+from termcore.io.textfile import Textfile
 from termcore.util.singleton import Singleton
 
 __all__ = [
@@ -115,8 +116,11 @@ class AppStateStorage(metaclass=Singleton):
         json_path = Path(self._json_file_path)
 
         try:
-            with json_path.open("w", encoding="utf-8") as file:
-                json.dump(self._json_dict, file, indent=4)
+            # Atomic: the state is rewritten whole on every change, so a
+            # plain write would truncate everything before writing anything.
+            Textfile.write_atomic(
+                json_path, json.dumps(self._json_dict, indent=4)
+            )
         except OSError as error:
             raise StateFileError(
                 f"File \"{json_path.resolve()}\" could not be written."
