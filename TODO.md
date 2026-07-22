@@ -88,11 +88,11 @@ ratada implements the following because ratatui draws every cell itself. Textual
 - Command palette: `App.COMMANDS` with a `Provider`.
 - Collapsible tree: `Tree` and `Collapsible`.
 - Markdown rendering and viewer: `Markdown` and `MarkdownViewer`.
-- Toasts and notifications: `App.notify`.
+- Toasts and notifications: `App.notify`, for anything that should outlast the next key press. A standing status line is not among them - Textual has no status widget at all, hence `StatusBar`.
 - Multi-line editor: `TextArea`.
-- Tab bar: `Tabs`, `TabbedContent`, `TabPane`.
+- Tab bar: `TabbedContent` and `TabPane` for the panes, which `AppHeader` still relies on. The bar itself is the exception: `Tabs` is `height: 2` with `overflow: hidden`, so tabs that do not fit scroll instead of wrapping, and section 1.8 asks for a wrapping one. Hide it with `TabbedContent > ContentTabs { display: none; }` and let `AppHeader` draw it.
 - Spinner and progress: `LoadingIndicator` and `ProgressBar`.
-- Header: `Header`.
+- Header: `Header` where a single centred title is enough. It is fixed at `height: 1` (3 with `-tall`), its three slots are hard-wired and its title is `text-wrap: nowrap`, so it cannot carry a brand cell and a wrapping tab bar - that is `AppHeader`.
 - Filesystem browser: `DirectoryTree`. Only a modal wrapper that returns the chosen path would be new.
 - Clipboard: `App.copy_to_clipboard`, plus the bindings already built into `Input` and `TextArea`.
 - Scrollbars on overflow, text truncation, wrapping and layout arithmetic: all CSS.

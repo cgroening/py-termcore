@@ -665,8 +665,11 @@ class TestScopeTitles:
     """
 
     TITLES = """
-        tasks_tab: "Tasks"
-        _global: "Global"
+        tasks_tab:
+          title: "Tasks"
+          key: "1"
+        _global:
+          title: "Global"
     """
 
     def test_a_declared_title_is_returned(
@@ -717,8 +720,10 @@ class TestScopeTitles:
             CustomBindings(
                 write_bindings(BINDINGS),
                 write_scopes("""
-                    tasks_tab: "Tasks"
-                    gone_tab: "Gone"
+                    tasks_tab:
+                      title: "Tasks"
+                    gone_tab:
+                      title: "Gone"
                 """),
             )
 
@@ -732,7 +737,7 @@ class TestScopeTitles:
         with caplog.at_level(logging.WARNING):
             bindings = CustomBindings(
                 write_bindings(BINDINGS),
-                write_scopes("tasks_tab: no"),
+                write_scopes("tasks_tab:\n  title: no"),
             )
 
         assert "quote the value" in caplog.text
@@ -743,4 +748,128 @@ class TestScopeTitles:
     ) -> None:
         bindings = CustomBindings(write_bindings(BINDINGS), write_scopes(""))
 
+        assert bindings.scope_title("tasks_tab") == "tasks_tab"
+
+
+class TestTabBindings:
+    """Declaring a key is what makes a scope a tab.
+
+    The key lives in the scopes file and nowhere else, so the header and the
+    shortcut that actually fires cannot disagree about it.
+    """
+
+    SCOPES = """
+        tasks_tab:
+          title: "Tasks"
+          key: "1"
+        done_tab:
+          title: "Done"
+          key: "2"
+        add_screen:
+          title: "Add dialog"
+        _global:
+          title: "Global"
+    """
+
+    def _bindings(
+        self, write_bindings: WriteBindings, write_scopes: WriteScopes
+    ) -> CustomBindings:
+        return CustomBindings(
+            write_bindings(BINDINGS), write_scopes(self.SCOPES)
+        )
+
+    def test_a_declared_key_is_returned(
+        self, write_bindings: WriteBindings, write_scopes: WriteScopes
+    ) -> None:
+        bindings = self._bindings(write_bindings, write_scopes)
+
+        assert bindings.scope_key("tasks_tab") == "1"
+
+    def test_a_scope_without_a_key_has_none(
+        self, write_bindings: WriteBindings, write_scopes: WriteScopes
+    ) -> None:
+        bindings = self._bindings(write_bindings, write_scopes)
+
+        assert bindings.scope_key("_global") == ""
+
+    def test_only_scopes_with_a_key_are_tabs(
+        self, write_bindings: WriteBindings, write_scopes: WriteScopes
+    ) -> None:
+        bindings = self._bindings(write_bindings, write_scopes)
+
+        assert bindings.get_tab_scopes() == ["tasks_tab", "done_tab"]
+
+    def test_the_tab_order_is_the_file_order(
+        self, write_bindings: WriteBindings, write_scopes: WriteScopes
+    ) -> None:
+        # Same rule as the footer: the file decides, nothing re-sorts.
+        bindings = CustomBindings(
+            write_bindings(BINDINGS),
+            write_scopes("""
+                done_tab:
+                  title: "Done"
+                  key: "2"
+                tasks_tab:
+                  title: "Tasks"
+                  key: "1"
+            """),
+        )
+
+        assert bindings.get_tab_scopes() == ["done_tab", "tasks_tab"]
+
+    def test_a_binding_is_built_for_every_tab(
+        self, write_bindings: WriteBindings, write_scopes: WriteScopes
+    ) -> None:
+        bindings = self._bindings(write_bindings, write_scopes)
+        tab_bindings = bindings.get_tab_bindings()
+
+        assert [b.key for b in tab_bindings if isinstance(b, Binding)] == [
+            "1", "2"
+        ]
+
+    def test_the_binding_carries_the_scope_as_its_argument(
+        self, write_bindings: WriteBindings, write_scopes: WriteScopes
+    ) -> None:
+        bindings = self._bindings(write_bindings, write_scopes)
+        first = bindings.get_tab_bindings()[0]
+
+        assert isinstance(first, Binding)
+        assert first.action == "show_tab('tasks_tab')"
+
+    def test_the_bindings_stay_out_of_the_footer(
+        self, write_bindings: WriteBindings, write_scopes: WriteScopes
+    ) -> None:
+        # The header already prints them; a footer row would repeat it.
+        bindings = self._bindings(write_bindings, write_scopes)
+
+        for binding in bindings.get_tab_bindings():
+            assert isinstance(binding, Binding)
+            assert binding.show is False
+
+    def test_the_binding_is_described_by_the_scope_title(
+        self, write_bindings: WriteBindings, write_scopes: WriteScopes
+    ) -> None:
+        bindings = self._bindings(write_bindings, write_scopes)
+        first = bindings.get_tab_bindings()[0]
+
+        assert isinstance(first, Binding)
+        assert first.description == "Tasks"
+
+    def test_without_a_scopes_file_there_are_no_tabs(
+        self, write_bindings: WriteBindings
+    ) -> None:
+        bindings = CustomBindings(write_bindings(BINDINGS))
+
+        assert bindings.get_tab_bindings() == []
+
+    def test_a_scope_that_is_not_a_mapping_is_reported(
+        self, write_bindings: WriteBindings, write_scopes: WriteScopes,
+        caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.WARNING):
+            bindings = CustomBindings(
+                write_bindings(BINDINGS), write_scopes('tasks_tab: "Tasks"')
+            )
+
+        assert "Expected a mapping" in caplog.text
         assert bindings.scope_title("tasks_tab") == "tasks_tab"

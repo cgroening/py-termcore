@@ -32,8 +32,10 @@ class TestTheStarExportCarriesOnlyTheApi:
     def test_the_surface_stays_small(self) -> None:
         # Not a magic number to keep in step: a sharp rise means a module
         # gained an import and lost its `__all__`, which is the defect this
-        # file exists for.
-        assert len(public_names(termcore)) < 100
+        # file exists for. Raised from 100 when the header and status bar
+        # were added deliberately - at 99 of 100 the next widget would have
+        # tripped this for the wrong reason.
+        assert len(public_names(termcore)) < 120
 
     def test_the_documented_entry_points_are_reachable(self) -> None:
         for name in (
@@ -41,6 +43,7 @@ class TestTheStarExportCarriesOnlyTheApi:
             "ThemeLoader", "CustomBindings", "QuestionScreen",
             "AppStateStorage", "MultiLineFooter",
             "BindingGroup", "HelpScreen", "active_actions",
+            "AppHeader", "StatusBar", "HeaderTab",
             "next_index", "clamped_index", "cell_width",
             "str_with_fixed_width", "DateFormat", "print_error",
         ):
@@ -50,7 +53,7 @@ class TestTheStarExportCarriesOnlyTheApi:
         # They are the arithmetic behind two widgets, not an API an
         # application consumes; exporting them would widen the surface for
         # nobody's benefit.
-        for name in ("FooterLayout", "build_rows", "hint_width"):
+        for name in ("FooterLayout", "build_rows", "hint_width", "pack"):
             assert not hasattr(termcore, name), name
 
 

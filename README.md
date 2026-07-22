@@ -153,6 +153,55 @@ yield CustomSelectionList(
 )
 ```
 
+### AppHeader
+
+The header section 1.8 of the style guide asks for: the application name in a column of its own, then the tabs with the key that selects each, wrapping onto further rows when they do not fit. Textual's `Header` cannot do it - it is fixed at `height: 1` (3 with `-tall`) with three hard-wired slots and a `nowrap` title - and neither can `Tabs`, which is `height: 2` with `overflow: hidden` and scrolls instead of wrapping.
+
+```python
+from termcore.tui.custom_widgets.app_header import AppHeader, HeaderTab
+
+yield AppHeader(
+    "mdtask",
+    [HeaderTab(scope, bindings.scope_key(scope), bindings.scope_title(scope))
+     for scope in bindings.get_tab_scopes()],
+    active="tasks_tab",
+)
+```
+
+```text
+ mdtask   [1] Tasks │ [2] Software │ [3] Allgemein │ [4] Notes
+          [5] Quick Notes │ [6] Focus │ [7] Checklists
+```
+
+The continuation rows leave the brand cell blank but exactly as wide, so the tabs form a column. The active tab is bold at normal brightness and the others are dimmed; the separator is drawn only between tabs on the same row, never at either end of one. Set `active` to move the highlight and `set_tabs` to replace the bar.
+
+`TabbedContent` keeps its panes - hide only its own bar with `TabbedContent > ContentTabs { display: none; }` and drive `TabbedContent.active` from the key bindings `CustomBindings.get_tab_bindings` builds.
+
+### StatusBar
+
+One line of status: standing information on the left, a passing message on the right. Textual has no status widget - `App.notify` covers only the passing half, and only as a box docked bottom right that expires on a timer.
+
+```python
+from termcore.tui.custom_widgets.status_bar import StatusBar
+
+bar = self.query_one(StatusBar)
+bar.info = "3 tasks · 1 done · 2 open"
+bar.message = "theme: classic-black"
+```
+
+```text
+ 3 tasks · 1 done · 2 open                    theme: classic-black
+```
+
+It does not dock itself, on purpose: Textual places everything docked to one edge in the same place, so a docked status bar would sit underneath the footer it belongs above. Put it last among the flowing widgets, above the docked footer, and give the content above it `height: 1fr`.
+
+Clearing `message` is the caller's job. The convention is the next key press, which Textual dispatches before the key's own action, so an action is free to set a new message right afterwards:
+
+```python
+def on_key(self, _event: events.Key) -> None:
+    self.query_one(StatusBar).message = ""
+```
+
 ### MultiLineFooter
 
 A drop-in replacement for Textual's built-in `Footer` that supports multiple rows of key bindings. Which of its two modes applies follows from whether groups are passed:

@@ -48,14 +48,23 @@ is reordered on the way out, so moving a group in the file moves its row.
 Scope display names
 -------------------
 Scope names such as `tasks_tab` are identifiers, not labels. A second file,
-passed as `scopes_file`, maps them to the names people see - the headings of
-the help overlay, and in an app that reads them, the labels of the tabs:
+passed as `scopes_file`, maps each scope to a `title` - the heading of the
+help overlay, and in an app that reads it, the label of the tab - and, where
+the scope is a tab, to the `key` that selects it:
 
 .. code-block:: yaml
 
-    tasks_tab: Tasks
-    add_screen: Add dialog
-    _global: Global
+    tasks_tab:
+      title: Tasks
+      key: "1"
+    add_screen:
+      title: Add dialog
+    _global:
+      title: Global
+
+Declaring a key is what makes a scope a tab; `get_tab_bindings` turns those
+keys into working shortcuts, so the key lives in one place only. The order of
+that file is the order of the tab bar.
 
 A scope with no entry there is shown under its raw name, which is meant to
 look unfinished. A title naming no scope is reported, because nothing else
@@ -133,6 +142,7 @@ _logger = logging.getLogger(__name__)
 _GROUP_FIELD = "group"
 _BINDINGS_FIELD = "bindings"
 _KEY_FIELD = "key"
+_TITLE_FIELD = "title"
 
 
 class CustomBindings:
@@ -156,6 +166,8 @@ class CustomBindings:
         Maps actions to the scopes they belong to.
     scope_titles : dict[str, str]
         Maps scope names to their display names, from the scopes file.
+    scope_keys : dict[str, str]
+        Maps tab scopes to the key that selects them, in file order.
     global_actions : list[str]
         List of actions that are always shown globally.
     """
@@ -167,6 +179,7 @@ class CustomBindings:
     _groups: list[BindingGroup]
     _action_to_scopes: dict[str, list[str]]
     _scope_titles: dict[str, str]
+    _scope_keys: dict[str, str]
     _global_actions: list[str]
 
 
@@ -188,6 +201,7 @@ class CustomBindings:
         self._groups = []
         self._action_to_scopes = {}
         self._scope_titles = {}
+        self._scope_keys = {}
         self._global_actions = []
         self._read_yaml_file()
         self._read_scopes_file()
@@ -200,17 +214,37 @@ class CustomBindings:
             self._bindings_dict_raw = yaml.safe_load(file)
 
     def _read_scopes_file(self) -> None:
-        """Loads the scope display names, if a file was given."""
+        """Loads the scope display names and tab keys, if a file was given."""
         if self._scopes_file_path is None:
             return
 
         with Path(self._scopes_file_path).open(encoding="utf-8") as file:
             raw = cast("dict[str, object]", yaml.safe_load(file) or {})
 
-        for scope, title in raw.items():
-            parsed = self._parse_text(title, field=f"title of {scope!r}")
-            if parsed is not None:
-                self._scope_titles[scope] = parsed
+        for scope, entry in raw.items():
+            self._read_scope_entry(scope, entry)
+
+    def _read_scope_entry(self, scope: str, entry: object) -> None:
+        """Reads one scope's display name and, where given, its tab key."""
+        if not isinstance(entry, dict):
+            _logger.warning(
+                "Expected a mapping for scope %r, got %r; skipping it",
+                scope, entry
+            )
+            return
+
+        fields = cast("dict[str, object]", entry)
+        title = self._parse_text(
+            fields.get(_TITLE_FIELD), field=f"title of {scope!r}"
+        )
+        if title is not None:
+            self._scope_titles[scope] = title
+
+        key = self._parse_text(
+            fields.get(_KEY_FIELD), field=f"key of {scope!r}"
+        )
+        if key is not None:
+            self._scope_keys[scope] = key
 
     def _warn_about_unknown_scopes(self) -> None:
         """
@@ -226,6 +260,65 @@ class CustomBindings:
                 "Scope titles without a matching scope: %s",
                 ", ".join(repr(scope) for scope in unknown)
             )
+
+    def scope_key(self, scope: str) -> str:
+        """
+        Returns the key that selects a scope, or "" when it is not a tab.
+
+        Declaring a key is what makes a scope a tab: it is the only marker,
+        so `_global` and the screen scopes simply have none.
+
+        Parameters
+        ----------
+        scope : str
+            The scope name as the YAML file spells it.
+
+        Returns
+        -------
+        str
+            The declared key, or an empty string.
+        """
+        return self._scope_keys.get(scope, "")
+
+    def get_tab_scopes(self) -> list[str]:
+        """
+        Returns the scopes that declare a key, in the order of the file.
+
+        That order is the order of the tab bar, exactly as the order of
+        `bindings.yaml` is the order of the footer.
+
+        Returns
+        -------
+        list[str]
+            The tab scopes, in file order.
+        """
+        return list(self._scope_keys)
+
+    def get_tab_bindings(self) -> list[BindingType]:
+        """
+        Returns bindings that switch to each tab, built from the scopes file.
+
+        The key lives in one place only, so the bar and the shortcut cannot
+        disagree about it. They are registered with `show=False`: the header
+        already prints them, and repeating them in the footer would say the
+        same thing twice.
+
+        A screen consuming these implements `action_show_tab(scope)`.
+
+        Returns
+        -------
+        list[BindingType]
+            One binding per tab scope, in file order.
+        """
+        return [
+            Binding(
+                key=key,
+                action=f"show_tab({scope!r})",
+                description=self.scope_title(scope),
+                show=False,
+            )
+            for scope, key in self._scope_keys.items()
+        ]
 
     def scope_title(self, scope: str) -> str:
         """
