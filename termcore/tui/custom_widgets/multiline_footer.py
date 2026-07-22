@@ -60,7 +60,7 @@ class FooterRow(HorizontalGroup):
         width: 1fr;
         height: 1;
         layout: horizontal;
-        background: $footer-background;
+        background: $background-lighten-1;
     }
     """
 
@@ -80,8 +80,8 @@ class FooterGroupLabel(Static):
     FooterGroupLabel {
         height: 1;
         text-wrap: nowrap;
-        color: $footer-description-foreground;
-        background: $footer-background;
+        color: $foreground-darken-3;
+        background: $background-lighten-1;
     }
     """
 
@@ -105,8 +105,8 @@ class FooterSeparator(Static):
     FooterSeparator {
         height: 1;
         text-wrap: nowrap;
-        color: $footer-description-foreground;
-        background: $footer-background;
+        color: $foreground-darken-3;
+        background: $background-lighten-1;
     }
     """
 
@@ -138,9 +138,11 @@ class MultiLineFooter(Footer):
 
     DEFAULT_CSS: str = """
     MultiLineFooter {
+        background: $background-lighten-1;
         height: auto;
         layout: vertical;
         scrollbar-size: 0 0;
+        padding: 1 1 0 1;
     }
     """
 

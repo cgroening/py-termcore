@@ -376,8 +376,9 @@ class ThemeLoader:
             If there's an error writing to the config file.
         """
         try:
-            with theme_config_file.open("w") as f:
-                json.dump({"theme": theme_name}, f)
+            Textfile.write_atomic(
+                theme_config_file, json.dumps({"theme": theme_name})
+            )
         except OSError:
             _logger.exception("Could not save theme config")
 

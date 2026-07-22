@@ -16,7 +16,8 @@ TEXTUAL_THEME = Theme(
     dark=True,
     variables={
         "block-hover-background": "#335D48",
-        "footer-key-foreground": "#D2D05F",
+        "footer-description-foreground": "#acacac",
+        "footer-key-foreground": "#7fb1ad",
         "input-cursor-text-style": "reverse",
     }
 )
