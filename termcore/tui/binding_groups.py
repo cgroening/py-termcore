@@ -20,6 +20,7 @@ __all__ = [
     "BindingGroup",
     "active_actions",
     "dispatch_name",
+    "display_scope",
 ]
 
 APP_PREFIX = "app."
@@ -40,11 +41,37 @@ class BindingGroup:
         `tasks_tab`. Part of the group's identity, not decoration.
     bindings : tuple[Binding, ...]
         The bindings of this group, in the order the file declares them.
+    scope_title : str
+        The scope's display name, empty when none was declared. Read it
+        through `display_scope`, which falls back to the raw name.
     """
 
     name: str
     scope: str
     bindings: tuple[Binding, ...]
+    scope_title: str = ""
+
+
+def display_scope(group: BindingGroup) -> str:
+    """
+    Returns the heading a group's scope should be shown under.
+
+    A scope with no declared title falls back to its raw name. That reads as
+    unfinished on purpose: it is a prompt to add the title, and the
+    alternative - inventing one from the identifier - would quietly produce
+    headings nobody chose.
+
+    Parameters
+    ----------
+    group : BindingGroup
+        The group whose scope should be named.
+
+    Returns
+    -------
+    str
+        The declared title, or the raw scope name.
+    """
+    return group.scope_title or group.scope
 
 
 def dispatch_name(action: str) -> str:

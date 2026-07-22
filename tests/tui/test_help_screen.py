@@ -16,6 +16,7 @@ from termcore.tui.help_screen import HelpScreen
 TASKS = BindingGroup(
     name="Tasks",
     scope="tasks_tab",
+    scope_title="Tasks",
     bindings=(
         Binding("a", "tasks_tab_add", "Add"),
         Binding("d", "tasks_tab_done", "Done"),
@@ -24,6 +25,7 @@ TASKS = BindingGroup(
 DONE = BindingGroup(
     name="Done",
     scope="done_tab",
+    scope_title="Done",
     bindings=(Binding("r", "done_tab_reopen", "Reopen"),),
 )
 GROUPS = [TASKS, DONE]
@@ -225,3 +227,93 @@ class TestClosing:
             await pilot.pause()
 
             assert not app.query(HelpScreen)
+
+
+GLOBAL_APPEARANCE = BindingGroup(
+    name="Appearance",
+    scope="_global",
+    scope_title="Global",
+    bindings=(Binding("w", "theme", "Theme"),),
+)
+GLOBAL_APP = BindingGroup(
+    name="App",
+    scope="_global",
+    scope_title="Global",
+    bindings=(Binding("q", "quit", "Quit"),),
+)
+
+
+class NestedApp(App[None]):
+    """An app whose overlay has a scope holding two groups."""
+
+    def compose(self) -> ComposeResult:
+        yield Static("body")
+
+    def on_mount(self) -> None:
+        self.push_screen(
+            HelpScreen([TASKS, GLOBAL_APPEARANCE, GLOBAL_APP])
+        )
+
+
+def prompts(app: App[None]) -> list[str]:
+    """Returns the rendered text of every row, in order."""
+    options = app.screen.query_one(OptionList)
+
+    return [
+        str(options.get_option_at_index(index).prompt)
+        for index in range(options.option_count)
+    ]
+
+
+class TestTwoLevels:
+    async def test_a_scope_with_one_group_shows_no_group_heading(
+        self,
+    ) -> None:
+        app = NestedApp()
+
+        async with app.run_test(size=(80, 24)) as pilot:
+            await pilot.pause()
+            rendered = prompts(app)
+
+            assert rendered[0] == "TASKS"
+            assert rendered[1].startswith("  a")
+
+    async def test_a_scope_with_two_groups_indents_them(self) -> None:
+        app = NestedApp()
+
+        async with app.run_test(size=(80, 24)) as pilot:
+            await pilot.pause()
+            rendered = prompts(app)
+            appearance = rendered.index("  Appearance")
+
+            assert rendered[appearance - 1] == "GLOBAL"
+            assert rendered[appearance + 1].startswith("    w")
+
+    async def test_the_entry_indent_follows_its_heading(self) -> None:
+        # An entry under a group heading sits one level deeper than one
+        # whose scope prints no group heading at all.
+        app = NestedApp()
+
+        async with app.run_test(size=(80, 24)) as pilot:
+            await pilot.pause()
+            rendered = prompts(app)
+            shallow = next(r for r in rendered if r.strip().startswith("a "))
+            deep = next(r for r in rendered if r.strip().startswith("w "))
+
+            assert len(shallow) - len(shallow.lstrip()) == 2
+            assert len(deep) - len(deep.lstrip()) == 4
+
+    async def test_neither_heading_kind_can_be_highlighted(self) -> None:
+        app = NestedApp()
+
+        async with app.run_test(size=(80, 24)) as pilot:
+            await pilot.pause()
+            options = app.screen.query_one(OptionList)
+
+            for _ in range(8):
+                await pilot.press("down")
+                await pilot.pause()
+                index = options.highlighted
+
+                assert index is not None
+                assert not options.get_option_at_index(index).disabled

@@ -27,11 +27,12 @@ from textual.widgets.option_list import Option
 
 from termcore.tui.binding_groups import BindingGroup
 from termcore.tui.help_rows import (
+    SCOPE_LEVEL,
+    HelpCoverage,
     HelpEntry,
     HelpHeader,
     HelpRequest,
     HelpRow,
-    HelpScope,
     build_rows,
 )
 
@@ -39,9 +40,11 @@ __all__ = [
     "HelpScreen",
 ]
 
-_SCOPE_HINTS = {
-    HelpScope.ALL: "ctrl+t only active  ·  esc close",
-    HelpScope.ACTIVE: "ctrl+t show all  ·  esc close",
+_INDENT = "  "
+
+_COVERAGE_HINTS = {
+    HelpCoverage.ALL: "ctrl+t only active  ·  esc close",
+    HelpCoverage.ACTIVE: "ctrl+t show all  ·  esc close",
 }
 
 
@@ -97,7 +100,9 @@ class HelpScreen(ModalScreen[None]):
 
     BINDINGS: list[BindingType] = [  # noqa: RUF012 - Textual class attribute
         Binding("escape,question_mark", "close", "Close", priority=True),
-        Binding("ctrl+t", "toggle_scope", "All or active", priority=True),
+        Binding(
+            "ctrl+t", "toggle_coverage", "All or active", priority=True
+        ),
         Binding("up", "cursor_up", "Up", show=False, priority=True),
         Binding("down", "cursor_down", "Down", show=False, priority=True),
         Binding("pageup", "page_up", "Page up", show=False, priority=True),
@@ -115,7 +120,7 @@ class HelpScreen(ModalScreen[None]):
         super().__init__()
         self._groups = tuple(groups)
         self._active = active
-        self._scope = HelpScope.ALL
+        self._coverage = HelpCoverage.ALL
 
     def compose(self) -> ComposeResult:
         """Builds the search field, the list and the status line."""
@@ -137,11 +142,11 @@ class HelpScreen(ModalScreen[None]):
         """Closes the overlay."""
         self.dismiss(None)
 
-    def action_toggle_scope(self) -> None:
+    def action_toggle_coverage(self) -> None:
         """Switches between every binding and the currently active ones."""
-        self._scope = (
-            HelpScope.ACTIVE if self._scope is HelpScope.ALL
-            else HelpScope.ALL
+        self._coverage = (
+            HelpCoverage.ACTIVE if self._coverage is HelpCoverage.ALL
+            else HelpCoverage.ALL
         )
         self._populate()
 
@@ -162,11 +167,13 @@ class HelpScreen(ModalScreen[None]):
         self.query_one(OptionList).action_page_down()
 
     def _populate(self) -> None:
-        """Rebuilds the list from the current query and scope."""
+        """Rebuilds the list from the current query and coverage."""
         query = self.query_one(Input).value
         rows = build_rows(
             self._groups,
-            HelpRequest(query=query, scope=self._scope, active=self._active),
+            HelpRequest(
+                query=query, coverage=self._coverage, active=self._active
+            ),
         )
         matcher = Matcher(query) if query else None
 
@@ -177,20 +184,29 @@ class HelpScreen(ModalScreen[None]):
         )
 
         self.query_one(Static).update(
-            f"{rows.matches} shortcuts  ·  {_SCOPE_HINTS[self._scope]}"
+            f"{rows.matches} shortcuts  ·  {_COVERAGE_HINTS[self._coverage]}"
         )
 
     @staticmethod
     def _option(row: HelpRow, matcher: Matcher | None) -> Option:
-        """Turns one row into an option, headers being unselectable."""
+        """Turns one row into an option, headings being unselectable."""
+        indent = Content(_INDENT * row.level)
+
         if isinstance(row, HelpHeader):
-            return Option(
-                Content.styled(row.label.upper(), "bold $primary"),
-                disabled=True,
+            # A scope shouts, a group inside one does not, so the two levels
+            # stay apart even where the indent alone is easy to miss.
+            style = (
+                "bold $primary" if row.level == SCOPE_LEVEL
+                else "bold $text-muted"
             )
+            label = row.label.upper() if row.level == SCOPE_LEVEL else row.label
+
+            return Option(indent + Content.styled(label, style), disabled=True)
 
         entry: HelpEntry = row
         if matcher is None:
-            return Option(Content(entry.text))
+            return Option(indent + Content(entry.text))
 
-        return Option(matcher.highlight(entry.text))
+        # The indent is prepended rather than baked into the text, because
+        # the highlight positions are relative to what the search matched.
+        return Option(indent + matcher.highlight(entry.text))

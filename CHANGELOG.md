@@ -13,6 +13,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - A `group` entry in the binding YAML. A scope may now hold groups, single bindings, or both; consecutive single bindings share one unlabelled row. Grouping is optional and adds no ceremony where it is not wanted
 - `tui/help_screen.py`: `HelpScreen`, the overlay section 1.8 of the style guide asks for - every shortcut, grouped, with a fuzzy search over them and a `ctrl+t` toggle between all bindings and the ones currently active. Matching uses Textual's own `Matcher` rather than a hand-written one
 - `tui/help_rows.py`: the filtering and row order behind the overlay, testable without an application
+- A second file of scope display names, passed to `CustomBindings` as `scopes_file`. Scope names such as `tasks_tab` are identifiers; this maps them to the words people read. `scope_title` resolves one, `BindingGroup.scope_title` carries it, and a title naming no scope is reported - nothing else would ever notice it
+- `display_scope`, which falls back to the raw scope name where no title was declared. The fallback is meant to look unfinished rather than invent a heading nobody chose
 - `tui/custom_widgets/footer_rows.py`: the footer's arithmetic - label column width, key width and wrapping - split out so it can be tested without an application and so `multiline_footer.py` stays inside the file-size limit
 - The first tests for `MultiLineFooter`, which had none: row order, separator count, label alignment, wrapping at a narrow width, and that clicking a key still runs its action
 
@@ -22,6 +24,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Breaking.** `CustomBindings.sorted_by_key` is gone, along with the alphabetical sorting it enabled. The order of the YAML file is now the order of the footer, without exception
 - **Breaking.** `MultiLineFooter` no longer takes `auto_wrap`. Passing `groups` selects the grouped layout; omitting it wraps on width, which is what the old default did
 - **Breaking.** `handle_check_action`'s keyword argument `active_group` is now `active_scope`. The word "group" now means a footer row throughout, and what it used to mean - a top-level key of the YAML file - is called a scope
+- The help overlay groups on two levels: the scope heads the section, the group is the level below it, and a scope holding a single group prints no group heading at all. The footer keeps its one-dimensional layout - the two surfaces answer different questions, which is why clibase gives them separate tables as well
+- **Breaking.** `HelpScope` is now `HelpCoverage` and `HelpRequest.scope` is `coverage`. With the overlay grouping by scope, the old name meant two things at once, which is exactly the ambiguity the group/scope split had just removed
 - The footer prints group labels in a left column of shared width, keys separated by ` · `. A group too wide to fit wraps onto continuation rows whose label cell stays blank, so the keys align under the keys rather than under the label
 - The command palette key's width is now reserved, so the last row can no longer wrap into the space it is docked in
 - Text fields are read strictly: a `key`, `action` or `description` that YAML resolved to a boolean is dropped with a warning naming the fix, instead of rendering `False` as a label

@@ -6,38 +6,56 @@ shortcut cannot appear in one and be missing from the other. This module
 holds the filtering and the row order and none of the widgets, which is what
 lets the rules below be tested without starting an application.
 
+Where the footer lays the groups out in one dimension, the overlay uses two.
+Its outer heading is the scope - the tab or screen a shortcut works on, which
+is what someone opening a help screen is actually asking about. The group is
+the inner heading, and it is left out where a scope holds only one of them,
+since repeating "Tasks" under "Tasks" tells nobody anything.
+
 Matching runs through Textual's own `Matcher`, the same fuzzy search its
 command palette uses. Entries keep the order the file declares them in; a
 score decides whether an entry survives, never where it lands.
 """
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum, auto
+from itertools import groupby
 
 from textual.binding import Binding
 from textual.fuzzy import Matcher
 
-from termcore.tui.binding_groups import BindingGroup, dispatch_name
+from termcore.tui.binding_groups import (
+    BindingGroup,
+    dispatch_name,
+    display_scope,
+)
 from termcore.util.string import str_with_fixed_width
 
 # Wide enough for the chords a terminal app realistically binds, so that the
 # descriptions line up into a column of their own.
 KEY_COLUMN = 12
 
+# The nesting a row sits at. Entries sit one below the heading above them,
+# so they land on GROUP_LEVEL or one deeper.
+SCOPE_LEVEL = 0
+GROUP_LEVEL = 1
+
 __all__ = [
+    "GROUP_LEVEL",
     "KEY_COLUMN",
+    "SCOPE_LEVEL",
+    "HelpCoverage",
     "HelpEntry",
     "HelpHeader",
     "HelpRequest",
     "HelpRow",
     "HelpRows",
-    "HelpScope",
     "build_rows",
     "key_display",
 ]
 
 
-class HelpScope(Enum):
+class HelpCoverage(Enum):
     """Which bindings the overlay lists."""
 
     ALL = auto()
@@ -47,15 +65,18 @@ class HelpScope(Enum):
 @dataclass(frozen=True, slots=True)
 class HelpHeader:
     """
-    The title of one group.
+    The title of a scope or of a group inside one.
 
     Attributes
     ----------
     label : str
-        The group's name, or the scope it came from when it has none.
+        The scope's display name, or the group's name.
+    level : int
+        `SCOPE_LEVEL` for a scope, `GROUP_LEVEL` for a group within one.
     """
 
     label: str
+    level: int = SCOPE_LEVEL
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,12 +96,16 @@ class HelpEntry:
         What the shortcut does.
     action : str
         The bare action name, for callers that need to identify the row.
+    level : int
+        How deep the entry sits: one below the heading above it, so one
+        deeper where its scope also prints group headings.
     """
 
     text: str
     key: str
     description: str
     action: str
+    level: int = GROUP_LEVEL
 
 
 HelpRow = HelpHeader | HelpEntry
@@ -95,15 +120,15 @@ class HelpRequest:
     ----------
     query : str
         The search text; empty keeps everything.
-    scope : HelpScope
+    scope : HelpCoverage
         Whether to list every declared binding or only the active ones.
     active : frozenset[str]
         The actions that are bound right now, without the `app.` prefix.
-        Only consulted for `HelpScope.ACTIVE`.
+        Only consulted for `HelpCoverage.ACTIVE`.
     """
 
     query: str = ""
-    scope: HelpScope = HelpScope.ALL
+    coverage: HelpCoverage = HelpCoverage.ALL
     active: frozenset[str] = frozenset()
 
 
@@ -153,17 +178,18 @@ def build_rows(
     """
     Turns groups into the rows the overlay lists.
 
-    A group contributes a header only when at least one of its entries
-    survives the filter, so a search never leaves an empty section behind.
-    Groups declared without a name are titled after their scope, because a
-    list, unlike the footer, cannot simply leave the space blank.
+    Groups are gathered under the scope they came from, and a scope appears
+    only when at least one of its entries survives the filter, so a search
+    never leaves an empty section behind. A scope left with a single group
+    prints no group heading: the second level is there to tell groups apart,
+    and there is nothing to tell apart.
 
     Parameters
     ----------
     groups : Sequence[BindingGroup]
         Every declared group, in file order.
     request : HelpRequest
-        The search text, the scope and the currently active actions.
+        The search text, the coverage and the currently active actions.
 
     Returns
     -------
@@ -174,16 +200,50 @@ def build_rows(
 
     rows: list[HelpRow] = []
     matches = 0
-    for group in groups:
-        entries = _entries(group, request, matcher)
-        if not entries:
+    for scope_groups in _by_scope(groups):
+        surviving = [
+            (group, entries)
+            for group in scope_groups
+            if (entries := _entries(group, request, matcher))
+        ]
+        if not surviving:
             continue
 
-        rows.append(HelpHeader(group.name or group.scope))
-        rows.extend(entries)
-        matches += len(entries)
+        rows.append(HelpHeader(display_scope(surviving[0][0]), SCOPE_LEVEL))
+        rows.extend(_scope_rows(surviving))
+        matches += sum(len(entries) for _group, entries in surviving)
 
     return HelpRows(rows=tuple(rows), matches=matches)
+
+
+def _by_scope(
+    groups: Sequence[BindingGroup],
+) -> list[list[BindingGroup]]:
+    """Gathers neighbouring groups that came from the same scope."""
+    return [
+        list(scope_groups)
+        for _scope, scope_groups in groupby(groups, key=lambda g: g.scope)
+    ]
+
+
+def _scope_rows(
+    surviving: Sequence[tuple[BindingGroup, list[HelpEntry]]],
+) -> list[HelpRow]:
+    """Returns one scope's rows, with group headings only where they help."""
+    # A single group under a scope would repeat what the scope already says,
+    # so its heading is dropped and its entries move up one level.
+    named = len(surviving) > 1
+
+    rows: list[HelpRow] = []
+    for group, entries in surviving:
+        heading = named and bool(group.name)
+        if heading:
+            rows.append(HelpHeader(group.name, GROUP_LEVEL))
+
+        level = GROUP_LEVEL + 1 if heading else GROUP_LEVEL
+        rows.extend(replace(entry, level=level) for entry in entries)
+
+    return rows
 
 
 def _entries(
@@ -193,7 +253,11 @@ def _entries(
     entries: list[HelpEntry] = []
     for binding in group.bindings:
         action = dispatch_name(binding.action)
-        if request.scope is HelpScope.ACTIVE and action not in request.active:
+        hidden = (
+            request.coverage is HelpCoverage.ACTIVE
+            and action not in request.active
+        )
+        if hidden:
             continue
 
         key = key_display(binding)

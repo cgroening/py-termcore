@@ -16,6 +16,7 @@ _THEME_MODULE = dedent(
 
 MakeTheme = Callable[..., Path]
 WriteBindings = Callable[[str], str]
+WriteScopes = Callable[[str], str]
 
 
 @pytest.fixture
@@ -32,6 +33,22 @@ def write_bindings(tmp_path: Path) -> WriteBindings:
         return str(path)
 
     return _write_bindings
+
+
+@pytest.fixture
+def write_scopes(tmp_path: Path) -> WriteScopes:
+    """
+    Returns a factory that writes a scope-titles file and returns its path.
+
+    Separate from `write_bindings` because the two are separate files, and
+    several tests are about what happens when they disagree.
+    """
+    def _write_scopes(yaml_text: str) -> str:
+        path = tmp_path / "scopes.yaml"
+        path.write_text(dedent(yaml_text).lstrip(), encoding="utf-8")
+        return str(path)
+
+    return _write_scopes
 
 
 @pytest.fixture

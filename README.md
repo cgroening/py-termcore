@@ -185,6 +185,8 @@ App:         ? Help · q Quit
 
 The overlay style guide section 1.8 asks every terminal interface for: every shortcut, grouped, with a fuzzy search over them. It reads the same groups the footer does, so a binding cannot appear in one and be missing from the other.
 
+Where the footer lays those groups out in one dimension, the overlay uses two. Its outer heading is the scope - the tab or screen a shortcut works on, which is what someone opening a help screen is asking about - and the group is the inner one. A scope holding a single group prints no group heading, since repeating "Tasks" under "Tasks" tells nobody anything.
+
 ```python
 from termcore.tui.binding_groups import active_actions
 from termcore.tui.help_screen import HelpScreen
@@ -193,6 +195,17 @@ def action_help(self) -> None:
     # Snapshot before the push: afterwards `self.screen` is the modal.
     active = active_actions(self.screen)
     self.push_screen(HelpScreen(bindings.get_groups(), active))
+```
+
+```text
+TASKS
+  a            Add
+  d            Done
+GLOBAL
+  Appearance
+    w          Previous Theme
+  App
+    q          Quit
 ```
 
 It opens listing every declared shortcut. `ctrl+t` narrows the list to the bindings that would actually fire where the overlay was opened, which is what the snapshot above feeds; `escape` and `?` close it. Matching is Textual's own `Matcher`, the fuzzy search behind its command palette, so `ntm` finds "next theme".
@@ -240,12 +253,25 @@ _global:
 
 An entry carrying `bindings` is a group; an entry carrying `key` is a single binding. Both may be mixed inside one scope, and consecutive single bindings share one unlabelled row.
 
+**Scope display names (`scopes.yaml`):**
+
+Scope names are identifiers, not labels. A second file maps them to the names people see - the headings of the help overlay, and in an app that reads them, the labels of the tabs:
+
+```yaml
+tasks_tab: "Tasks"
+add_screen: "Add dialog"
+_global: "Global"
+```
+
+A scope with no entry there is shown under its raw name, which is meant to look unfinished rather than be quietly invented. A title naming no scope is reported, because nothing else would ever notice it. `bindings.scope_title(scope)` resolves one, and every `BindingGroup` carries the title of its own scope.
+
 **Usage:**
 
 ```python
 from termcore.tui.custom_bindings import CustomBindings
 
 bindings = CustomBindings("bindings.yaml")   # file order, always
+bindings = CustomBindings("bindings.yaml", "scopes.yaml")  # with titles
 
 # In your App or Screen:
 # On the App: globals dispatch as declared

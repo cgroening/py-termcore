@@ -17,7 +17,7 @@ import pytest
 from textual.binding import Binding
 
 from termcore.tui.custom_bindings import CustomBindings
-from tests.tui.conftest import WriteBindings
+from tests.tui.conftest import WriteBindings, WriteScopes
 
 BINDINGS = """
 _global:
@@ -654,3 +654,93 @@ class TestKeyDisplayPrecedence:
 
         assert isinstance(binding, Binding)
         assert binding.key_display is None
+
+
+class TestScopeTitles:
+    """The display names of the scopes live in a second file.
+
+    A second file can go stale in both directions - a scope with no title, a
+    title for a scope that no longer exists - and neither shows up while the
+    app runs. Both directions are pinned here.
+    """
+
+    TITLES = """
+        tasks_tab: "Tasks"
+        _global: "Global"
+    """
+
+    def test_a_declared_title_is_returned(
+        self, write_bindings: WriteBindings, write_scopes: WriteScopes
+    ) -> None:
+        bindings = CustomBindings(
+            write_bindings(BINDINGS), write_scopes(self.TITLES)
+        )
+
+        assert bindings.scope_title("tasks_tab") == "Tasks"
+
+    def test_a_scope_without_a_title_falls_back_to_its_name(
+        self, write_bindings: WriteBindings, write_scopes: WriteScopes
+    ) -> None:
+        # The raw name is meant to look unfinished rather than be invented.
+        bindings = CustomBindings(
+            write_bindings(BINDINGS), write_scopes(self.TITLES)
+        )
+
+        assert bindings.scope_title("done_tab") == "done_tab"
+
+    def test_without_a_scopes_file_every_title_is_the_raw_name(
+        self, write_bindings: WriteBindings
+    ) -> None:
+        bindings = CustomBindings(write_bindings(BINDINGS))
+
+        assert bindings.scope_title("tasks_tab") == "tasks_tab"
+
+    def test_the_groups_carry_the_title(
+        self, write_bindings: WriteBindings, write_scopes: WriteScopes
+    ) -> None:
+        # The overlay reads it off the group, so the two must agree.
+        bindings = CustomBindings(
+            write_bindings(BINDINGS), write_scopes(self.TITLES)
+        )
+        titles = {g.scope: g.scope_title for g in bindings.get_groups()}
+
+        assert titles["tasks_tab"] == "Tasks"
+        assert titles["done_tab"] == ""
+
+    def test_a_title_without_a_scope_is_reported(
+        self, write_bindings: WriteBindings, write_scopes: WriteScopes,
+        caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # Left behind by a renamed scope, and invisible otherwise: nothing
+        # ever asks for that scope, so the stale line just sits there.
+        with caplog.at_level(logging.WARNING):
+            CustomBindings(
+                write_bindings(BINDINGS),
+                write_scopes("""
+                    tasks_tab: "Tasks"
+                    gone_tab: "Gone"
+                """),
+            )
+
+        assert "'gone_tab'" in caplog.text
+
+    def test_a_non_string_title_is_refused(
+        self, write_bindings: WriteBindings, write_scopes: WriteScopes,
+        caplog: pytest.LogCaptureFixture
+    ) -> None:
+        # The Norway problem again: an unquoted "No" arrives as a bool.
+        with caplog.at_level(logging.WARNING):
+            bindings = CustomBindings(
+                write_bindings(BINDINGS),
+                write_scopes("tasks_tab: no"),
+            )
+
+        assert "quote the value" in caplog.text
+        assert bindings.scope_title("tasks_tab") == "tasks_tab"
+
+    def test_an_empty_scopes_file_is_not_an_error(
+        self, write_bindings: WriteBindings, write_scopes: WriteScopes
+    ) -> None:
+        bindings = CustomBindings(write_bindings(BINDINGS), write_scopes(""))
+
+        assert bindings.scope_title("tasks_tab") == "tasks_tab"

@@ -45,6 +45,22 @@ Each binding supports the following fields:
 The order of the file is the order of the footer, without exception. Nothing
 is reordered on the way out, so moving a group in the file moves its row.
 
+Scope display names
+-------------------
+Scope names such as `tasks_tab` are identifiers, not labels. A second file,
+passed as `scopes_file`, maps them to the names people see - the headings of
+the help overlay, and in an app that reads them, the labels of the tabs:
+
+.. code-block:: yaml
+
+    tasks_tab: Tasks
+    add_screen: Add dialog
+    _global: Global
+
+A scope with no entry there is shown under its raw name, which is meant to
+look unfinished. A title naming no scope is reported, because nothing else
+would ever notice it.
+
 Scope naming rules
 ------------------
 `_global`
@@ -138,32 +154,95 @@ class CustomBindings:
         Every declared group, in the order the file declares them.
     action_to_scopes : dict[str, list[str]]
         Maps actions to the scopes they belong to.
+    scope_titles : dict[str, str]
+        Maps scope names to their display names, from the scopes file.
     global_actions : list[str]
         List of actions that are always shown globally.
     """
 
     _yaml_file_path: str
+    _scopes_file_path: str | None
     _bindings_dict_raw: dict[str, list[dict[str, object]]]
     _bindings_dict: dict[str, list[Binding]]
     _groups: list[BindingGroup]
     _action_to_scopes: dict[str, list[str]]
+    _scope_titles: dict[str, str]
     _global_actions: list[str]
 
 
-    def __init__(self, yaml_file: str) -> None:
-        """Reads the YAML file, keeping the order it declares."""
+    def __init__(self, yaml_file: str, scopes_file: str | None = None) -> None:
+        """
+        Reads the YAML file, keeping the order it declares.
+
+        Parameters
+        ----------
+        yaml_file : str
+            Path to the file declaring the scopes, groups and bindings.
+        scopes_file : str or None, optional
+            Path to a file mapping scope names to display names. Without it
+            every scope is shown under its raw name.
+        """
         self._yaml_file_path = yaml_file
+        self._scopes_file_path = scopes_file
         self._bindings_dict = {}
         self._groups = []
         self._action_to_scopes = {}
+        self._scope_titles = {}
         self._global_actions = []
         self._read_yaml_file()
+        self._read_scopes_file()
         self._process_bindings()
+        self._warn_about_unknown_scopes()
 
     def _read_yaml_file(self) -> None:
         """Loads the binding definitions from the YAML file."""
         with Path(self._yaml_file_path).open(encoding="utf-8") as file:
             self._bindings_dict_raw = yaml.safe_load(file)
+
+    def _read_scopes_file(self) -> None:
+        """Loads the scope display names, if a file was given."""
+        if self._scopes_file_path is None:
+            return
+
+        with Path(self._scopes_file_path).open(encoding="utf-8") as file:
+            raw = cast("dict[str, object]", yaml.safe_load(file) or {})
+
+        for scope, title in raw.items():
+            parsed = self._parse_text(title, field=f"title of {scope!r}")
+            if parsed is not None:
+                self._scope_titles[scope] = parsed
+
+    def _warn_about_unknown_scopes(self) -> None:
+        """
+        Warns about a declared title that matches no scope.
+
+        A title left behind by a renamed or deleted scope is invisible: the
+        scope it names is simply never asked about, so the stale line sits
+        there looking correct.
+        """
+        unknown = sorted(set(self._scope_titles) - set(self._bindings_dict))
+        if unknown:
+            _logger.warning(
+                "Scope titles without a matching scope: %s",
+                ", ".join(repr(scope) for scope in unknown)
+            )
+
+    def scope_title(self, scope: str) -> str:
+        """
+        Returns the display name of a scope.
+
+        Parameters
+        ----------
+        scope : str
+            The scope name as the YAML file spells it, e.g. `tasks_tab`.
+
+        Returns
+        -------
+        str
+            The declared title, or the scope name itself when none was
+            declared. The raw name is meant to look unfinished.
+        """
+        return self._scope_titles.get(scope, scope)
 
     def _process_bindings(self) -> None:
         """
@@ -233,7 +312,12 @@ class CustomBindings:
 
         self._bindings_dict[scope].extend(bindings)
         self._groups.append(
-            BindingGroup(name=name, scope=scope, bindings=tuple(bindings))
+            BindingGroup(
+                name=name,
+                scope=scope,
+                bindings=tuple(bindings),
+                scope_title=self._scope_titles.get(scope, ""),
+            )
         )
 
     def _build_binding(
